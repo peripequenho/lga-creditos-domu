@@ -2,17 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { applicationSchema, type ApplicationInput } from '@/lib/schema';
 import { sql } from '@/lib/db';
 
-// ============================================================================
-// Edge route — escribe directo a Supabase (sin tunnel, sin n8n)
-// ----------------------------------------------------------------------------
-// Antes pasaba por: Vercel Edge → tunnel → n8n local → Supabase
-// Ahora: Vercel Node → Supabase Postgres pooler directo
-// runtime: 'nodejs' porque postgres-js requiere TCP (no Edge runtime).
-// ============================================================================
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 15;
+export const maxDuration = 20;
 
 type ZoneRow = { status: 'in_zone' | 'out_of_zone' | 'needs_review'; zone_id: string | null };
 type ClientRow = { id: string };
@@ -45,7 +37,7 @@ export async function POST(req: NextRequest) {
   const ua = req.headers.get('user-agent') ?? '';
 
   try {
-    // 1) Upsert client por DNI
+    // 1) Upsert client
     const clientRows = (await sql<ClientRow[]>`
       insert into clients (
         dni, first_name, last_name, email, phone_e164, birth_date,
@@ -82,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     const zone = zoneRows[0] ?? { status: 'needs_review' as const, zone_id: null };
 
-    // 3) Insert credit_application (idempotente por idempotency_key)
+    // 3) Insert credit_application
     const appRows = (await sql<AppRow[]>`
       insert into credit_applications (
         client_id, status, zone_status, zone_id,
@@ -91,7 +83,10 @@ export async function POST(req: NextRequest) {
         requested_amount_ars, requested_installments, declared_income_ars,
         utm_source, utm_medium, utm_campaign, utm_content, utm_term,
         referrer_url, landing_url, ip, user_agent,
-        idempotency_key, raw_payload
+        idempotency_key, raw_payload,
+        payment_frequency, housing_status, occupation, occupation_detail,
+        guarantor_name, guarantor_phone, guarantor_relation,
+        estimated_installment_ars
       ) values (
         ${clientId}, 'submitted', ${zone.status}::zone_status, ${zone.zone_id},
         ${p.shop}, ${p.source ?? null}, ${p.product_id ?? null}, ${p.variant_id ?? null},
@@ -102,7 +97,11 @@ export async function POST(req: NextRequest) {
         ${p.utm_source ?? null}, ${p.utm_medium ?? null}, ${p.utm_campaign ?? null},
         ${p.utm_content ?? null}, ${p.utm_term ?? null},
         ${p.referrer_url ?? null}, ${p.landing_url ?? null}, ${ip}, ${ua},
-        ${p.idempotency_key}, ${JSON.stringify(p)}::jsonb
+        ${p.idempotency_key}, ${JSON.stringify(p)}::jsonb,
+        ${p.payment_frequency}::payment_frequency, ${p.housing_status}::housing_status,
+        ${p.occupation}::occupation_type, ${p.occupation_detail ?? null},
+        ${p.guarantor_name ?? null}, ${p.guarantor_phone ?? null}, ${p.guarantor_relation ?? null},
+        ${p.estimated_installment_ars ?? null}
       )
       on conflict (idempotency_key) do update set
         raw_payload = credit_applications.raw_payload
@@ -111,7 +110,23 @@ export async function POST(req: NextRequest) {
 
     const app = appRows[0]!;
 
-    // 4) Insert application_event (no bloqueante)
+    // 4) Insert document metadata rows si vinieron (paths en Storage)
+    const docs: Array<{ doc_type: string; path: string | undefined }> = [
+      { doc_type: 'dni_front',   path: p.doc_dni_front },
+      { doc_type: 'dni_back',    path: p.doc_dni_back },
+      { doc_type: 'selfie_dni',  path: p.doc_selfie_dni },
+      { doc_type: 'income_proof',path: p.doc_income_proof },
+    ];
+    for (const d of docs) {
+      if (!d.path) continue;
+      sql`
+        insert into documents (application_id, client_id, doc_type, file_path)
+        values (${app.id}::uuid, ${clientId}::uuid, ${d.doc_type}, ${d.path})
+        on conflict do nothing
+      `.catch((e) => console.error('doc_insert_failed', d.doc_type, e?.message ?? e));
+    }
+
+    // 5) Insert application_event (no bloqueante)
     sql`
       insert into application_events (
         application_id, actor, actor_label, event_type, to_status, detail
@@ -124,11 +139,13 @@ export async function POST(req: NextRequest) {
           utm_source: p.utm_source ?? null,
           utm_campaign: p.utm_campaign ?? null,
           zone_status: zone.status,
+          payment_frequency: p.payment_frequency,
+          housing_status: p.housing_status,
+          occupation: p.occupation,
+          docs_uploaded: docs.filter(d => d.path).length,
         })}::jsonb
       )
-    `.catch((e) => {
-      console.error('event_insert_failed', e?.message ?? e);
-    });
+    `.catch((e) => console.error('event_insert_failed', e?.message ?? e));
 
     return NextResponse.json(
       {
