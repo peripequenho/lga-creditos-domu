@@ -1,126 +1,121 @@
 # Estado actual del sistema — 2026-05-15
 
-## 🟢 FUNCIONANDO end-to-end EN PRODUCCIÓN
+## Arquitectura productiva (all-cloud, 0 dependencia de tu PC)
 
 ```
-Cliente → https://creditos.domuhogar.com/aplicar → Vercel Edge route
-   → HMAC sign(ts.idempotency_key)
-   → POST https://<tunnel>.trycloudflare.com/webhook/lga-new-credit-app
-   → n8n self-hosted local (workflow activo)
-   → Postgres Supabase pooler aws-1-sa-east-1
-   → INSERT clients + credit_applications + application_events
-   → response JSON con application_code
+Cliente browser
+   ↓ POST
+https://creditos.domuhogar.com/aplicar  (Vercel)
+   ↓ /api/submit-application (Node runtime)
+   ↓ postgres-js sobre pooler aws-1-sa-east-1.pooler.supabase.com:6543
+Supabase Postgres
+   ↓ rows en clients + credit_applications + application_events
+   ↓ (futuro: trigger / cron n8n / Supabase Realtime)
+n8n local (opcional, para automatizaciones async: scoring, WhatsApp, mora)
 ```
 
-**Test productivo confirmado:**
-- `LGA-260515-0001` (test local)
-- `LGA-260515-0002` (test productivo desde Vercel)
-- Ambos visibles en Supabase `credit_applications`.
+**No hay tunnel. No hay n8n en el path crítico. No depende de tu PC encendida.**
 
-## ⚠️ El tunnel es TEMPORAL
+## Verificaciones hechas
 
-Estoy usando **TryCloudflare quick tunnel** (URL random gratis). Cuando reinicies la PC o cierres `cloudflared`, el tunnel muere y la URL cambia.
+| Test | Resultado |
+|---|---|
+| Local: form local → Supabase directo | ✅ `LGA-260515-0003` |
+| Producción: `creditos.domuhogar.com` → Supabase directo | ⏳ pending (esperando deploy con DATABASE_URL) |
 
-**URL actual del tunnel:** `https://wiring-becoming-into-feof.trycloudflare.com`
+## Componentes y IDs
 
-**Vercel env var actualmente apunta a esa URL.**
+| Recurso | Valor |
+|---|---|
+| GitHub repo | [`peripequenho/lga-creditos-domu`](https://github.com/peripequenho/lga-creditos-domu) privado |
+| Vercel project | `lga-creditos-domu` en team `lga` |
+| Vercel custom domain | `creditos.domuhogar.com` ✅ con SSL |
+| Supabase project ref | `tbzlkrvmlfyqyzqkkerf` |
+| Supabase URL | `https://tbzlkrvmlfyqyzqkkerf.supabase.co` |
+| Supabase region | `sa-east-1` (São Paulo) |
+| DB password | `24njWnOyeSeFdtd8` 🔒 **guardar en password manager** |
+| Pooler host | `aws-1-sa-east-1.pooler.supabase.com:6543` |
+| Pooler user | `postgres.tbzlkrvmlfyqyzqkkerf` |
+| Hostinger CNAME `creditos` | → `cname.vercel-dns.com.` ✅ |
+| Shopify store | `mem1a9-ev.myshopify.com` (dominio público `domuhogar.com`) |
 
-## 🔴 Lo que falta para 100% producción
+## Vercel environment variables (productivas)
 
-### 1. Tunnel permanente con `n8n.lga-arg.com`
-
-El bloqueo: `lga-arg.com` tiene NS en Hostinger, no en Cloudflare. Para crear tunnel permanente con tu dominio:
-
-**Paso a paso:**
-
-1. **Crear cuenta Cloudflare** (gratis): https://dash.cloudflare.com/sign-up
-2. **Add Site** → `lga-arg.com` → plan **Free**.
-3. Cloudflare escanea DNS y te muestra los nameservers a usar (algo como `xxx.ns.cloudflare.com` + `yyy.ns.cloudflare.com`).
-4. **Hostinger** → Dominios → `lga-arg.com` → Cambiar nameservers → pegar los 2 de CF.
-5. Esperar 0-24 hs propagación. Cloudflare te avisa por email cuando está "Active".
-6. Volver acá y avisame "lga-arg.com está active en CF". Yo retomo desde ahí.
-
-Cuando esté active, ejecuto:
-```powershell
-& "C:\Users\Gero\.claude\scripts\cloudflared.exe" tunnel login          # browser auth
-& "C:\Users\Gero\.claude\scripts\cloudflared.exe" tunnel create lga-n8n
-& "C:\Users\Gero\.claude\scripts\cloudflared.exe" tunnel route dns lga-n8n n8n.lga-arg.com
-& "C:\Users\Gero\.claude\scripts\cloudflared.exe" service install
-```
-
-Y actualizo la env var de Vercel a `https://n8n.lga-arg.com/webhook/lga-new-credit-app`.
-
-### 2. Shopify snippets
-
-Los archivos están en:
-- `shopify/snippet-pdp.liquid`
-- `shopify/snippet-cart.liquid`
-
-**Pegarlos en Shopify** (5 min):
-1. `https://admin.shopify.com/store/mem1a9-ev/themes` → Customize del theme publicado.
-2. **Backup primero**: Themes → "..." → Duplicate → renombrar `Backup pre-LGA 2026-05-15`.
-3. Template **Product → Default product** → Add block "Custom Liquid" → pegar contenido de `snippet-pdp.liquid` → Save.
-4. Template **Cart → Default cart** → Add section "Custom Liquid" → pegar contenido de `snippet-cart.liquid` → Save.
-5. Verificar en preview: abrir cualquier producto → botón "Comprar con crédito LGA" visible → click → debería ir a `creditos.domuhogar.com/aplicar?...`.
-
-⚠️ **No puedo automatizar esto** porque el Theme Editor de Shopify corre en iframe cross-origin protegido.
-
-### 3. Variables/config que vos quizás quieras cambiar
-
-| Variable | Dónde | Valor actual | Tu valor |
-|---|---|---|---|
-| `NEXT_PUBLIC_LGA_WHATSAPP` | Vercel env vars | `+5493815551234` | El real |
-| `LGA_WEBHOOK_SECRET` | Mismo en Vercel + `~/.claude/scripts/n8n-start.cmd` | hex64 generado | Rotar si querés. **No olvidar cambiar EN AMBOS lados** |
-
-## 🛑 Si reiniciás la PC
-
-El tunnel temporal va a morir. Para reactivarlo:
-
-```powershell
-& "C:\Users\Gero\.claude\scripts\cloudflared.exe" tunnel --url http://localhost:5678
-```
-
-Esperá la línea `https://<x>.trycloudflare.com` (toma ~5 seg). Después actualizá la env var `N8N_WEBHOOK_URL` en Vercel con esa URL nueva + Redeploy. Mientras no migres lga-arg.com a CF, este paso se repite cada vez.
-
-Para evitar esto: **hacer el cambio de NS** (sección 1). Una vez hecho, el tunnel arranca como servicio Windows y nunca cambia.
-
-## Componentes y IDs útiles
-
-| Recurso | ID/URL | Notas |
+| Var | Scope | Valor |
 |---|---|---|
-| GitHub repo | `peripequenho/lga-creditos-domu` | privado |
-| Vercel project | `lga-creditos-domu` en team `lga` | trial 14 días — agregar tarjeta antes |
-| Vercel deploy | `lga-creditos-domu.vercel.app` | URL canónica |
-| Custom domain | `creditos.domuhogar.com` | OK, SSL verificado |
-| Supabase project | `lga-creditos` org `LGA` ref `tbzlkrvmlfyqyzqkkerf` | sa-east-1, Free tier |
-| Supabase API URL | `https://tbzlkrvmlfyqyzqkkerf.supabase.co` | |
-| Supabase DB password | `24njWnOyeSeFdtd8` | **Guardalo seguro** |
-| n8n workflow | `LGA - Nueva solicitud crédito Domu` id `faSy7peLy80VrKCi` | activo |
-| n8n credencial Postgres | `Supabase LGA — Postgres` id `857MwnILNdTuy8gr` | pooler aws-1-sa-east-1 |
-| Shopify store | `mem1a9-ev.myshopify.com` (público `domuhogar.com`) | |
-| Hostinger CNAME `creditos` | → `cname.vercel-dns.com.` | OK |
-| Tunnel temporal (cambia) | `wiring-becoming-into-feof.trycloudflare.com` | NO persistente |
+| `DATABASE_URL` | Production + Preview | `postgresql://postgres.tbzlkrvmlfyqyzqkkerf:<DB_PASS>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres` |
+| `NEXT_PUBLIC_SITE_URL` | Production | `https://creditos.domuhogar.com` |
+| `NEXT_PUBLIC_LGA_WHATSAPP` | Production | `+5493815551234` *(placeholder — cambiar cuando me pases el WA real)* |
 
-## Verificar que sigue funcionando
+> Las env vars `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` ya **no se usan** y pueden borrarse (deprecated por la nueva arquitectura).
+
+## n8n local — qué hacer con él
+
+Pasa a ser **opcional y solo para automatización async**. El workflow `LGA - Nueva solicitud crédito Domu` (id `faSy7peLy80VrKCi`) **ya no es path crítico**.
+
+Opciones:
+1. **Desactivarlo** desde la UI (no lo borres, queda como template) — el form sigue funcionando, simplemente el webhook deja de recibir nada.
+2. **Repropósito**: cambiar el trigger a Postgres polling sobre `application_events` (no implementado todavía) → cuando llegue una nueva solicitud, n8n levanta y ejecuta scoring + WhatsApp.
+
+La credencial Postgres `Supabase LGA — Postgres` (id `857MwnILNdTuy8gr`) queda y se usa para los workflows async futuros.
+
+## Lo único que falta de tu lado
+
+### 1. Snippets Shopify (5 min)
+
+`https://admin.shopify.com/store/mem1a9-ev/themes` → Customize:
+1. **Backup primero**: Themes → "..." → Duplicate → renombrar `Backup pre-LGA 2026-05-15`.
+2. Templates → Product → Add block "Custom Liquid" → pegar contenido de [`shopify/snippet-pdp.liquid`](../shopify/snippet-pdp.liquid).
+3. Templates → Cart → Add section "Custom Liquid" → pegar [`shopify/snippet-cart.liquid`](../shopify/snippet-cart.liquid).
+
+⚠️ No puedo automatizarlo porque el Theme Editor de Shopify corre en iframe cross-origin protegido.
+
+### 2. Pasame WhatsApp real
+
+Actualmente está placeholder `+5493815551234` en Vercel env var `NEXT_PUBLIC_LGA_WHATSAPP`. Cambialo desde Vercel → Settings → Env Vars cuando me lo pases o me decís y lo cambio yo.
+
+### 3. Vercel: agregar tarjeta antes del trial
+
+El trial expira en 14 días. Después del trial sin tarjeta, el proyecto puede quedar suspendido.
+
+## Verificar end-to-end
 
 ```powershell
-# Test E2E productivo (desde cualquier máquina con internet)
+# Test productivo desde cualquier máquina con internet:
 $payload = [System.IO.File]::ReadAllText("C:\Users\Gero\PROYECTOS\lga-creditos-domu\n8n\test-e2e-productivo.payload.json", [System.Text.UTF8Encoding]::new($false)) | ConvertFrom-Json
 $payload | Add-Member -NotePropertyName 'idempotency_key' -NotePropertyValue ([Guid]::NewGuid().ToString()) -Force
 $body = $payload | ConvertTo-Json -Compress
 Invoke-RestMethod -Method Post -Uri "https://creditos.domuhogar.com/api/submit-application" -ContentType 'application/json' -Body $body
 ```
 
-Debe responder con `application_code: "LGA-260515-XXXX"`.
+Debe responder `application_code: "LGA-260515-XXXX"`.
 
-## Datos para verificar en Supabase
+## Verificar en Supabase
 
 SQL Editor:
 ```sql
-select a.application_code, a.status, a.zone_status, a.requested_amount_ars, a.requested_installments,
-       c.dni, c.full_name, c.phone_e164, a.utm_source, a.utm_campaign, a.created_at
+select a.application_code, a.status, a.zone_status,
+       a.requested_amount_ars, a.requested_installments,
+       c.dni, c.full_name, c.phone_e164,
+       a.utm_source, a.utm_campaign, a.created_at
 from credit_applications a
 join clients c on c.id = a.client_id
 order by a.created_at desc
 limit 20;
 ```
+
+## Cambios respecto a la versión anterior
+
+| Antes | Ahora |
+|---|---|
+| Vercel Edge → HMAC sign → tunnel → n8n → Postgres | Vercel Node → postgres-js → Postgres |
+| Dependencia de PC encendida 24/7 | Cero dependencia de tu PC |
+| Tunnel temporal (URL cambia al reiniciar) | URL permanente `creditos.domuhogar.com` |
+| HMAC compartido entre Vercel y n8n | DATABASE_URL en server env de Vercel, no se expone |
+| Latencia: ~500ms (tunnel + n8n + Postgres) | Latencia: ~50ms (pooler directo) |
+| 3 env vars (URL + SECRET + WhatsApp) | 2 env vars (DATABASE_URL + WhatsApp) |
+| n8n requerido para procesar form | n8n opcional, solo async |
+
+## Si querés tunnel permanente igual (para administración n8n remota)
+
+Sigue siendo válido el plan: migrar NS `lga-arg.com` a Cloudflare + Cloudflare Tunnel. Eso te da `https://n8n.lga-arg.com` para acceder a la UI de n8n desde cualquier lado. Pero ya no afecta al form ni a la captura de solicitudes. Es para vos administrar.
