@@ -20,13 +20,22 @@ if (-not (Test-Path $PayloadFile)) { Write-Error "No existe $PayloadFile"; exit 
 # Leer body como string (sin BOM)
 $body = [System.IO.File]::ReadAllText($PayloadFile, [System.Text.UTF8Encoding]::new($false))
 
+# Asegurar nuevo idempotency_key en cada corrida (para no chocar contra ON CONFLICT)
+$payloadObj = $body | ConvertFrom-Json
+$payloadObj.idempotency_key = [Guid]::NewGuid().ToString()
+$body = $payloadObj | ConvertTo-Json -Compress
+$idem = $payloadObj.idempotency_key
+
 # Timestamp Unix (segundos)
 $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds().ToString()
 
-# HMAC-SHA256(ts + "." + body) en hex lowercase
+# HMAC-SHA256(ts + "." + idempotency_key) en hex lowercase
+# (NO firmamos el body crudo porque n8n parsea el JSON antes de pasarlo al
+#  Code node, lo que rompería el match byte a byte. Firmar idem+ts es
+#  suficiente para prevenir replay y tampering de identidad.)
 $hmac = New-Object System.Security.Cryptography.HMACSHA256
 $hmac.Key = [System.Text.Encoding]::UTF8.GetBytes($Secret)
-$signedData = $ts + "." + $body
+$signedData = $ts + "." + $idem
 $sigBytes = $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($signedData))
 $sig = (-join ($sigBytes | ForEach-Object { $_.ToString('x2') }))
 
