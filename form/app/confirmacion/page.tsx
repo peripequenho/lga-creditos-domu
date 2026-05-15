@@ -56,7 +56,7 @@ export default function ConfirmacionPage({ searchParams }: { searchParams: Searc
         Si no recibís contacto en 24 hs hábiles, escribinos al WhatsApp {WA}.
       </p>
       <p>
-        <a href="https://mem1a9-ev.myshopify.com" className="text-sm text-lga-primary underline">
+        <a href="https://domuhogar.com" className="text-sm text-lga-primary underline">
           ← Volver a Domu
         </a>
       </p>

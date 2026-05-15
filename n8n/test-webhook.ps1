@@ -3,7 +3,7 @@
 # ----------------------------------------------------------------------------
 # Uso:
 #   $env:LGA_WEBHOOK_SECRET = "<hex64>"
-#   $env:LGA_WEBHOOK_URL    = "https://n8n.<TU_DOMINIO>/webhook/lga-new-credit-app"
+#   $env:LGA_WEBHOOK_URL    = "https://n8n.lga-arg.com/webhook/lga-new-credit-app"
 #   .\test-webhook.ps1
 # ============================================================================
 

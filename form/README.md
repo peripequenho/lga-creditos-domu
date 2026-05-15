@@ -1,4 +1,4 @@
-# form — Next.js (creditos.domu.com.ar)
+# form — Next.js (creditos.domuhogar.com)
 
 Frontend del formulario de solicitud de crédito LGA para clientes de Domu.
 
@@ -43,9 +43,9 @@ Configurar env vars en **Project Settings → Environment Variables**:
 
 | Var | Scope | Value |
 |---|---|---|
-| `N8N_WEBHOOK_URL` | Production, Preview | `https://n8n.lga.com.ar/webhook/lga-new-credit-app` |
+| `N8N_WEBHOOK_URL` | Production, Preview | `https://n8n.lga-arg.com/webhook/lga-new-credit-app` |
 | `N8N_WEBHOOK_SECRET` | Production, Preview | mismo valor que en `~/.n8n/.env` |
-| `NEXT_PUBLIC_SITE_URL` | Production | `https://creditos.domu.com.ar` |
+| `NEXT_PUBLIC_SITE_URL` | Production | `https://creditos.domuhogar.com` |
 | `NEXT_PUBLIC_LGA_WHATSAPP` | Production | `+5493815551234` |
 
 ## Estructura

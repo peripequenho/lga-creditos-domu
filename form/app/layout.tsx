@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
             <nav className="text-xs text-zinc-500">
-              <a href="https://mem1a9-ev.myshopify.com" className="hover:text-zinc-800">← Volver a Domu</a>
+              <a href="https://domuhogar.com" className="hover:text-zinc-800">← Volver a Domu</a>
             </nav>
           </div>
         </header>

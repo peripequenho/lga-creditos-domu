@@ -4,8 +4,8 @@
 
 - [ ] **Backup theme Shopify**: Themes → "..." → Duplicate → renombrar `Backup pre-LGA <YYYY-MM-DD>`.
 - [ ] **Cuenta Supabase** creada, proyecto nuevo en region `sa-east-1`, DB password guardada en password manager.
-- [ ] **Dominio `creditos.domu.com.ar`** apuntando a Vercel (CNAME `cname.vercel-dns.com`).
-- [ ] **Dominio `n8n.lga.com.ar`** apuntando vía Cloudflare Tunnel a `localhost:5678`.
+- [ ] **Dominio `creditos.domuhogar.com`** apuntando a Vercel (CNAME `cname.vercel-dns.com`).
+- [ ] **Dominio `n8n.lga-arg.com`** apuntando vía Cloudflare Tunnel a `localhost:5678`.
 - [ ] **cloudflared** instalado como servicio Windows: `cloudflared service install`.
 - [ ] **Secret generado**: `openssl rand -hex 32` → guardar mismo valor en `.env.local` (Vercel) y `~/.n8n/.env` (n8n).
 
@@ -50,15 +50,15 @@
 
 - [ ] `cd form && pnpm install` (o `npm install`).
 - [ ] Copiar `.env.local.example` a `.env.local` y completar:
-  - `N8N_WEBHOOK_URL=https://n8n.lga.com.ar/webhook/lga-new-credit-app`
+  - `N8N_WEBHOOK_URL=https://n8n.lga-arg.com/webhook/lga-new-credit-app`
   - `N8N_WEBHOOK_SECRET=<el mismo de n8n>`
-  - `NEXT_PUBLIC_SITE_URL=https://creditos.domu.com.ar`
+  - `NEXT_PUBLIC_SITE_URL=https://creditos.domuhogar.com`
   - `NEXT_PUBLIC_LGA_WHATSAPP=+5493815551234`
 - [ ] `pnpm dev` → abrir `http://localhost:3000/aplicar?shop=test&cart_total=35000000&title=Test&price=35000000&qty=1` → ver form prefill.
 - [ ] `pnpm build` → sin errores TypeScript.
 - [ ] Deploy a Vercel: `vercel --prod` (o conectar GitHub).
 - [ ] Configurar env vars en Vercel (Production + Preview).
-- [ ] Configurar dominio `creditos.domu.com.ar` en Vercel.
+- [ ] Configurar dominio `creditos.domuhogar.com` en Vercel.
 - [ ] Esperar emisión SSL (~minutos).
 
 ## Shopify (último paso, después de que n8n + form estén listos)
@@ -67,13 +67,13 @@
 - [ ] **PDP**: Themes → Customize → Products → Default product → Add block "Custom Liquid" dentro de la sección Product information → pegar `shopify/snippet-pdp.liquid` → posicionar debajo del CTA "Add to cart" → Save.
 - [ ] **Cart page**: Cart → Default cart → Add section "Custom Liquid" → pegar `shopify/snippet-cart.liquid` → posicionar antes del CTA "Checkout" → Save.
 - [ ] **(Opcional) Cart drawer**: si el theme lo permite, mismo proceso. Sino dejar solo Cart page.
-- [ ] Verificar en preview: producto cualquiera → botón visible → click → cae en `creditos.domu.com.ar/aplicar?...`.
+- [ ] Verificar en preview: producto cualquiera → botón visible → click → cae en `creditos.domuhogar.com/aplicar?...`.
 
 ## Verificación end-to-end (12 pasos)
 
-1. [ ] Abrir incognito: `https://mem1a9-ev.myshopify.com/products/<producto>?utm_source=qa&utm_campaign=mvp`.
+1. [ ] Abrir incognito: `https://domuhogar.com/products/<producto>?utm_source=qa&utm_campaign=mvp`.
 2. [ ] Botón "Comprar con crédito LGA" visible debajo del CTA principal.
-3. [ ] Click → redirect a `creditos.domu.com.ar/aplicar?...` con todos los params.
+3. [ ] Click → redirect a `creditos.domuhogar.com/aplicar?...` con todos los params.
 4. [ ] Resumen del pedido muestra título, precio (en pesos enteros), qty correctos.
 5. [ ] Completar form con DNI ficticio `99999999`, dirección `Av. Mate de Luna 1200`, postal `T4000`.
 6. [ ] Submit → redirect a `/confirmacion?code=LGA-YYMMDD-NNNN&zone=in_zone`.
@@ -95,9 +95,9 @@
 
 ## Riesgos a verificar antes del lanzamiento
 
-- [ ] DNS `creditos.domu.com.ar` propagado >48 hs antes del go-live (`dig` o `nslookup`).
+- [ ] DNS `creditos.domuhogar.com` propagado >48 hs antes del go-live (`dig` o `nslookup`).
 - [ ] SSL Vercel emitido y válido (browser muestra candado verde).
-- [ ] SSL `n8n.lga.com.ar` emitido por Cloudflare.
+- [ ] SSL `n8n.lga-arg.com` emitido por Cloudflare.
 - [ ] Cloudflare Tunnel corriendo como servicio Windows (`Get-Service cloudflared`).
 - [ ] n8n con backup reciente del SQLite (`bak-domu-*` en `~/.n8n/`).
 - [ ] `LGA_WEBHOOK_SECRET` idéntico en Vercel env y `~/.n8n/.env` (un solo char distinto y todo falla).

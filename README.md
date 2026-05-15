@@ -6,10 +6,10 @@ Sistema de crédito propio de LGA integrado con la tienda Shopify Domu. **Fase 1
 
 ## Stack Fase 1
 
-- **Shopify** Domu (`mem1a9-ev.myshopify.com`) — bloques Custom Liquid pegados desde Theme Editor.
-- **Next.js 14** App Router + Tailwind + Zod + react-hook-form, deploy Vercel, dominio `creditos.domu.com.ar`.
+- **Shopify** Domu (`domuhogar.com`, store interno `mem1a9-ev.myshopify.com`) — bloques Custom Liquid pegados desde Theme Editor.
+- **Next.js 14** App Router + Tailwind + Zod + react-hook-form, deploy Vercel, dominio `creditos.domuhogar.com`.
 - **Supabase** Postgres (proyecto nuevo, region `sa-east-1`).
-- **n8n** self-hosted ya existente, expuesto a internet con **Cloudflare Tunnel** en `n8n.lga.com.ar`.
+- **n8n** self-hosted ya existente, expuesto a internet con **Cloudflare Tunnel** en `n8n.lga-arg.com`.
 
 ## Estructura
 
@@ -22,7 +22,7 @@ lga-creditos-domu/
 │  └─ snippet-cart.liquid       Botón para Cart template / drawer
 ├─ n8n/
 │  └─ README.md                 Guía paso a paso para construir el workflow en la UI
-├─ form/                        App Next.js (subdominio creditos.domu.com.ar)
+├─ form/                        App Next.js (subdominio creditos.domuhogar.com)
 │  ├─ app/
 │  │  ├─ aplicar/page.tsx       Formulario público
 │  │  ├─ confirmacion/page.tsx  Pantalla post-submit
@@ -45,9 +45,9 @@ lga-creditos-domu/
 ## Quick start (orden recomendado)
 
 1. **Supabase** — crear proyecto, ejecutar `supabase/001_init_schema.sql` en SQL Editor.
-2. **Cloudflare Tunnel** — exponer `localhost:5678` (n8n) como `n8n.lga.com.ar`.
+2. **Cloudflare Tunnel** — exponer `localhost:5678` (n8n) como `n8n.lga-arg.com`.
 3. **n8n workflow** — construir `LGA - Nueva solicitud crédito Domu` siguiendo `n8n/README.md`.
-4. **Next.js form** — `cd form && pnpm install && pnpm dev`. Deploy Vercel con dominio `creditos.domu.com.ar`.
+4. **Next.js form** — `cd form && pnpm install && pnpm dev`. Deploy Vercel con dominio `creditos.domuhogar.com`.
 5. **Shopify** — duplicate del theme (backup) + pegar snippets como Custom Liquid en Theme Editor.
 
 Detalles en `docs/CHECKLIST.md`.

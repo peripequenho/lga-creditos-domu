@@ -27,8 +27,8 @@ Workflow que recibe el POST del formulario Next.js y persiste la solicitud en Su
 - **Response Mode:** `Using Respond to Webhook Node`
 - **Options → Raw Body:** `true`
 
-Producción quedará accesible en `https://n8n.lga.com.ar/webhook/lga-new-credit-app` vía Cloudflare Tunnel.
-Test mode: `https://n8n.lga.com.ar/webhook-test/lga-new-credit-app` (solo cuando "Listen for test event" está activo).
+Producción quedará accesible en `https://n8n.lga-arg.com/webhook/lga-new-credit-app` vía Cloudflare Tunnel.
+Test mode: `https://n8n.lga-arg.com/webhook-test/lga-new-credit-app` (solo cuando "Listen for test event" está activo).
 
 ---
 
@@ -388,13 +388,13 @@ cloudflared tunnel login
 cloudflared tunnel create lga-n8n
 
 # Asociar dominio
-cloudflared tunnel route dns lga-n8n n8n.lga.com.ar
+cloudflared tunnel route dns lga-n8n n8n.lga-arg.com
 
 # Config: C:\Users\Gero\.cloudflared\config.yml
 #   tunnel: <id>
 #   credentials-file: C:\Users\Gero\.cloudflared\<id>.json
 #   ingress:
-#     - hostname: n8n.lga.com.ar
+#     - hostname: n8n.lga-arg.com
 #       service: http://localhost:5678
 #     - service: http_status:404
 
@@ -418,7 +418,7 @@ $sig = ([System.BitConverter]::ToString(
   $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$ts.$body"))
 ) -replace '-','').ToLower()
 
-curl.exe -X POST "https://n8n.lga.com.ar/webhook/lga-new-credit-app" `
+curl.exe -X POST "https://n8n.lga-arg.com/webhook/lga-new-credit-app" `
   -H "Content-Type: application/json" `
   -H "X-LGA-Signature: $sig" `
   -H "X-LGA-Timestamp: $ts" `
