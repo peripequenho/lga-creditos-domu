@@ -1,49 +1,88 @@
 {%- comment -%}
   ============================================================================
-  LGA Credit Button — Cart version (cart page o cart drawer)
+  LGA Credit Button — Cart (versión secundaria / outline)
   ----------------------------------------------------------------------------
+  Estilo subtle para NO competir con el CTA "Continuar con la compra".
+  Queda como opción alternativa, debajo del checkout normal.
+
   CÓMO INSTALAR
   Cart page:
-   1) Online Store → Themes → Customize.
-   2) Template selector → "Cart → Default cart".
-   3) Add section → "Custom Liquid".
-   4) Pegar este código completo.
-   5) Posicionar la sección antes o después del CTA "Checkout".
-   6) Save.
+   1) Themes → Customize → "Cart → Default cart".
+   2) Add section → "Custom Liquid".
+   3) Pegar este código.
+   4) Posicionar DEBAJO del botón "Checkout" (Continuar con la compra).
+   5) Save.
 
-  Cart drawer (si tu theme lo expone como template editable):
-   - Mismo proceso bajo "Cart drawer" en el selector de templates.
-   - Si tu theme NO permite Custom Liquid en el drawer, configurá el cart como
-     "Page" (Theme settings → Cart type → Page) y dejá el botón solo en la
-     página de carrito.
+  Cart drawer:
+   1) Themes → Customize → "Cart drawer" en el selector.
+   2) Add block dentro de "Cart drawer" → "Custom Liquid".
+   3) Pegar este código.
+   4) IMPORTANTE: en el panel derecho del block, "Position" = "Cart footer".
+   5) Drag el bloque para que quede DEBAJO de "Checkout button".
+   6) Save.
   ============================================================================
 {%- endcomment -%}
 
 <div id="lga-credit-cart" class="lga-credit-wrap" data-context="cart">
+  <div class="lga-credit-divider" aria-hidden="true"><span>o también</span></div>
+
   <button type="button" class="lga-credit-btn" id="lga-credit-cart-trigger">
     <span class="lga-credit-ico" aria-hidden="true">💳</span>
     <span class="lga-credit-label">
-      Comprar todo en cuotas con LGA
-      <small>Total: <span id="lga-cart-total">${{ cart.total_price | money_without_currency }}</span> · hasta 24 cuotas</small>
+      <strong>Pagar este carrito en cuotas con LGA</strong>
+      <small>Total: ${{ cart.total_price | money_without_currency }} · pago semanal, mensual o diario en efectivo · hasta 24 cuotas</small>
     </span>
+    <span class="lga-credit-arrow" aria-hidden="true">›</span>
   </button>
+
+  <p class="lga-credit-help">
+    Proceso aparte del checkout normal. LGA evalúa la solicitud y te contacta por WhatsApp.
+    Solo Tucumán.
+  </p>
 </div>
 
 <style>
-  #lga-credit-cart.lga-credit-wrap { margin: 12px 0 18px; }
-  #lga-credit-cart .lga-credit-btn {
-    display:flex; align-items:center; gap:10px; width:100%;
-    padding:14px 16px; background:#0F766E; color:#fff;
-    border:0; border-radius:10px; font: inherit; font-weight:600; font-size:16px;
-    cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.12);
-    transition: transform .08s ease, box-shadow .15s ease;
+  #lga-credit-cart.lga-credit-wrap { margin: 16px 0 8px; }
+
+  #lga-credit-cart .lga-credit-divider {
+    position: relative; text-align: center;
+    margin: 14px 0 12px;
+    color: #94a3b8; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1.5px;
   }
-  #lga-credit-cart .lga-credit-btn:hover  { box-shadow:0 4px 10px rgba(0,0,0,.18); }
+  #lga-credit-cart .lga-credit-divider::before,
+  #lga-credit-cart .lga-credit-divider::after {
+    content: ''; position: absolute; top: 50%;
+    width: calc(50% - 50px); height: 1px;
+    background: #e5e7eb;
+  }
+  #lga-credit-cart .lga-credit-divider::before { left: 0; }
+  #lga-credit-cart .lga-credit-divider::after  { right: 0; }
+  #lga-credit-cart .lga-credit-divider span { padding: 0 10px; position: relative; z-index: 1; }
+
+  #lga-credit-cart .lga-credit-btn {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; padding: 13px 14px;
+    background: #ffffff; color: #0F766E;
+    border: 1.5px solid #0F766E; border-radius: 10px;
+    font: inherit; font-weight: 600; font-size: 14.5px;
+    cursor: pointer; text-align: left;
+    transition: background .15s ease, transform .08s ease, box-shadow .15s ease;
+  }
+  #lga-credit-cart .lga-credit-btn:hover  { background: #F0FDFA; box-shadow: 0 2px 6px rgba(15,118,110,.08); }
   #lga-credit-cart .lga-credit-btn:active { transform: translateY(1px); }
-  #lga-credit-cart .lga-credit-btn:disabled { opacity:.55; cursor:not-allowed; }
-  #lga-credit-cart .lga-credit-ico { font-size:22px; }
-  #lga-credit-cart .lga-credit-label { display:flex; flex-direction:column; text-align:left; }
-  #lga-credit-cart .lga-credit-label small { font-weight:400; font-size:12px; opacity:.9; }
+  #lga-credit-cart .lga-credit-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+  #lga-credit-cart .lga-credit-ico { font-size: 22px; line-height: 1; flex-shrink: 0; }
+  #lga-credit-cart .lga-credit-label { display: flex; flex-direction: column; flex: 1; gap: 2px; }
+  #lga-credit-cart .lga-credit-label strong { font-weight: 600; font-size: 14.5px; line-height: 1.2; }
+  #lga-credit-cart .lga-credit-label small  { font-weight: 400; font-size: 11.5px; color: #64748b; line-height: 1.35; }
+  #lga-credit-cart .lga-credit-arrow { font-size: 22px; opacity: .5; flex-shrink: 0; }
+
+  #lga-credit-cart .lga-credit-help {
+    font-size: 11px; color: #94a3b8;
+    margin: 8px 4px 0; text-align: center; line-height: 1.4;
+  }
 </style>
 
 <script>
@@ -91,9 +130,9 @@
       variant_id: String(primary.variant_id),
       title: primary.product_title || '',
       handle: primary.handle || '',
-      price: String(primary.price),                // centavos del primer item
+      price: String(primary.price),
       qty: String(primary.quantity),
-      cart_total: String(cart.total_price),        // centavos total carrito
+      cart_total: String(cart.total_price),
       cart_token: cart.token || '',
       cart_items: String(cart.items.length),
       ref: location.href

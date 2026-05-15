@@ -1,59 +1,83 @@
 {%- comment -%}
   ============================================================================
-  LGA Credit Button — PDP version
+  LGA Credit Button — PDP (versión secundaria / outline)
   ----------------------------------------------------------------------------
-  CÓMO INSTALAR
-  1) Online Store → Themes → Customize (sobre el theme publicado).
-  2) Template selector (arriba) → "Products → Default product".
-  3) En la sidebar buscar la sección con el botón "Add to cart"
-     (suele ser "Product information" en Dawn).
-  4) Click "Add block" dentro de esa sección → elegir "Custom Liquid".
-  5) Mover el bloque DEBAJO del botón Add to cart.
-  6) Pegar este código completo en el campo "Liquid" del bloque.
-  7) Save.
+  Estilo intencionalmente subtle para NO competir con el CTA principal
+  "Comprar ahora / Agregar al carrito". Queda como opción alternativa.
 
-  Si tu theme no permite Custom Liquid como BLOQUE dentro de la sección,
-  usá la sección global "Custom Liquid" y arrastrala dentro del template
-  Product, posicionada debajo del CTA principal.
+  CÓMO INSTALAR
+  1) Online Store → Themes → Customize.
+  2) Template selector → "Products → Default product".
+  3) Sección "Product information" → Add block → "Custom Liquid".
+  4) Posicionar DEBAJO del "Buy buttons".
+  5) Pegar este código en el campo "Liquid". Save.
 
   EXCLUIR PRODUCTOS PUNTUALES
-  Si querés que un producto NO muestre el botón LGA, agregale el tag
-  'no-lga' desde Shopify admin (Products → tu producto → Tags).
+  Agregar tag 'no-lga' al producto en Shopify admin.
   ============================================================================
 {%- endcomment -%}
 
 {% unless product.tags contains 'no-lga' %}
 <div id="lga-credit-pdp" class="lga-credit-wrap" data-context="pdp">
+  <div class="lga-credit-divider" aria-hidden="true"><span>o también</span></div>
+
   <button type="button" class="lga-credit-btn" id="lga-credit-trigger">
     <span class="lga-credit-ico" aria-hidden="true">💳</span>
     <span class="lga-credit-label">
-      Comprar con crédito LGA
-      <small>Hasta 24 cuotas · solo Tucumán</small>
+      <strong>Pagá en cuotas con crédito LGA</strong>
+      <small>Pago semanal, mensual o diario en efectivo · hasta 24 cuotas · solo Tucumán</small>
     </span>
+    <span class="lga-credit-arrow" aria-hidden="true">›</span>
   </button>
+
   <p class="lga-credit-help">
-    Te llevamos a un formulario seguro. No cobramos nada acá: LGA evalúa tu
-    solicitud y te contacta por WhatsApp.
+    Es un proceso aparte del pago directo: LGA evalúa la solicitud y te contacta por WhatsApp.
+    No se cobra nada acá.
   </p>
 </div>
 
 <style>
-  #lga-credit-pdp.lga-credit-wrap { margin: 12px 0 18px; }
-  #lga-credit-pdp .lga-credit-btn {
-    display: flex; align-items: center; gap: 10px;
-    width: 100%; padding: 14px 16px;
-    background: #0F766E; color: #fff; border: 0; border-radius: 10px;
-    font: inherit; font-weight: 600; font-size: 16px; cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,.12);
-    transition: transform .08s ease, box-shadow .15s ease;
+  #lga-credit-pdp.lga-credit-wrap { margin: 18px 0; }
+
+  #lga-credit-pdp .lga-credit-divider {
+    position: relative; text-align: center;
+    margin: 16px 0 14px;
+    color: #94a3b8; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1.5px;
   }
-  #lga-credit-pdp .lga-credit-btn:hover  { box-shadow: 0 4px 10px rgba(0,0,0,.18); }
+  #lga-credit-pdp .lga-credit-divider::before,
+  #lga-credit-pdp .lga-credit-divider::after {
+    content: ''; position: absolute; top: 50%;
+    width: calc(50% - 50px); height: 1px;
+    background: #e5e7eb;
+  }
+  #lga-credit-pdp .lga-credit-divider::before { left: 0; }
+  #lga-credit-pdp .lga-credit-divider::after  { right: 0; }
+  #lga-credit-pdp .lga-credit-divider span { padding: 0 10px; background: transparent; position: relative; z-index: 1; }
+
+  #lga-credit-pdp .lga-credit-btn {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; padding: 14px 16px;
+    background: #ffffff; color: #0F766E;
+    border: 1.5px solid #0F766E; border-radius: 10px;
+    font: inherit; font-weight: 600; font-size: 15px;
+    cursor: pointer; text-align: left;
+    transition: background .15s ease, transform .08s ease, box-shadow .15s ease;
+  }
+  #lga-credit-pdp .lga-credit-btn:hover  { background: #F0FDFA; box-shadow: 0 2px 6px rgba(15,118,110,.08); }
   #lga-credit-pdp .lga-credit-btn:active { transform: translateY(1px); }
   #lga-credit-pdp .lga-credit-btn:disabled { opacity: .55; cursor: not-allowed; }
-  #lga-credit-pdp .lga-credit-ico { font-size: 22px; line-height: 1; }
-  #lga-credit-pdp .lga-credit-label { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
-  #lga-credit-pdp .lga-credit-label small { font-weight: 400; font-size: 12px; opacity: .9; }
-  #lga-credit-pdp .lga-credit-help { font-size: 12px; color: #6b7280; margin: 6px 2px 0; }
+
+  #lga-credit-pdp .lga-credit-ico { font-size: 22px; line-height: 1; flex-shrink: 0; }
+  #lga-credit-pdp .lga-credit-label { display: flex; flex-direction: column; flex: 1; gap: 2px; }
+  #lga-credit-pdp .lga-credit-label strong { font-weight: 600; font-size: 15px; line-height: 1.2; }
+  #lga-credit-pdp .lga-credit-label small  { font-weight: 400; font-size: 11.5px; color: #64748b; line-height: 1.35; }
+  #lga-credit-pdp .lga-credit-arrow { font-size: 22px; opacity: .5; flex-shrink: 0; }
+
+  #lga-credit-pdp .lga-credit-help {
+    font-size: 11px; color: #94a3b8;
+    margin: 8px 4px 0; text-align: center; line-height: 1.4;
+  }
 </style>
 
 <script>
@@ -128,13 +152,12 @@
     });
     Object.keys(utm).forEach(function(k){ params.set(k, utm[k]); });
 
-    // Tracking opcional
     try { if (window.gtag) window.gtag('event','lga_credit_click',{source:'pdp',product_id:product.id}); } catch(e){}
     try { if (window.fbq)  window.fbq('trackCustom','LGACreditClick',{source:'pdp',product_id:product.id}); } catch(e){}
 
     btn.disabled = true;
-    var labelSpan = btn.querySelector('.lga-credit-label');
-    if (labelSpan && labelSpan.firstChild) labelSpan.firstChild.textContent = 'Abriendo formulario…';
+    var labelStrong = btn.querySelector('.lga-credit-label strong');
+    if (labelStrong) labelStrong.textContent = 'Abriendo formulario…';
     location.href = FORM_BASE + '?' + params.toString();
   });
 })();
