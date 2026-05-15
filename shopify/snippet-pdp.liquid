@@ -1,0 +1,142 @@
+{%- comment -%}
+  ============================================================================
+  LGA Credit Button — PDP version
+  ----------------------------------------------------------------------------
+  CÓMO INSTALAR
+  1) Online Store → Themes → Customize (sobre el theme publicado).
+  2) Template selector (arriba) → "Products → Default product".
+  3) En la sidebar buscar la sección con el botón "Add to cart"
+     (suele ser "Product information" en Dawn).
+  4) Click "Add block" dentro de esa sección → elegir "Custom Liquid".
+  5) Mover el bloque DEBAJO del botón Add to cart.
+  6) Pegar este código completo en el campo "Liquid" del bloque.
+  7) Save.
+
+  Si tu theme no permite Custom Liquid como BLOQUE dentro de la sección,
+  usá la sección global "Custom Liquid" y arrastrala dentro del template
+  Product, posicionada debajo del CTA principal.
+
+  EXCLUIR PRODUCTOS PUNTUALES
+  Si querés que un producto NO muestre el botón LGA, agregale el tag
+  'no-lga' desde Shopify admin (Products → tu producto → Tags).
+  ============================================================================
+{%- endcomment -%}
+
+{% unless product.tags contains 'no-lga' %}
+<div id="lga-credit-pdp" class="lga-credit-wrap" data-context="pdp">
+  <button type="button" class="lga-credit-btn" id="lga-credit-trigger">
+    <span class="lga-credit-ico" aria-hidden="true">💳</span>
+    <span class="lga-credit-label">
+      Comprar con crédito LGA
+      <small>Hasta 24 cuotas · solo Tucumán</small>
+    </span>
+  </button>
+  <p class="lga-credit-help">
+    Te llevamos a un formulario seguro. No cobramos nada acá: LGA evalúa tu
+    solicitud y te contacta por WhatsApp.
+  </p>
+</div>
+
+<style>
+  #lga-credit-pdp.lga-credit-wrap { margin: 12px 0 18px; }
+  #lga-credit-pdp .lga-credit-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 14px 16px;
+    background: #0F766E; color: #fff; border: 0; border-radius: 10px;
+    font: inherit; font-weight: 600; font-size: 16px; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,.12);
+    transition: transform .08s ease, box-shadow .15s ease;
+  }
+  #lga-credit-pdp .lga-credit-btn:hover  { box-shadow: 0 4px 10px rgba(0,0,0,.18); }
+  #lga-credit-pdp .lga-credit-btn:active { transform: translateY(1px); }
+  #lga-credit-pdp .lga-credit-btn:disabled { opacity: .55; cursor: not-allowed; }
+  #lga-credit-pdp .lga-credit-ico { font-size: 22px; line-height: 1; }
+  #lga-credit-pdp .lga-credit-label { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+  #lga-credit-pdp .lga-credit-label small { font-weight: 400; font-size: 12px; opacity: .9; }
+  #lga-credit-pdp .lga-credit-help { font-size: 12px; color: #6b7280; margin: 6px 2px 0; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+  var FORM_BASE = 'https://creditos.domu.com.ar/aplicar';
+  var SHOP      = {{ shop.permanent_domain | json }};
+  var btn       = document.getElementById('lga-credit-trigger');
+  if (!btn) return;
+
+  // --- Helpers UTM (URL → cookie persistente 30 días) -----------------------
+  function readUtmFromUrl() {
+    var p = new URLSearchParams(location.search);
+    var u = {};
+    ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
+      var v = p.get(k); if (v) u[k] = v;
+    });
+    return u;
+  }
+  function readUtmCookie() {
+    var m = document.cookie.match(/(?:^|;\s*)lga_utm=([^;]+)/);
+    if (!m) return {};
+    try { return JSON.parse(decodeURIComponent(m[1])); } catch(e){ return {}; }
+  }
+  function writeUtmCookie(u) {
+    if (!u || !Object.keys(u).length) return;
+    var v = encodeURIComponent(JSON.stringify(u));
+    var exp = new Date(Date.now() + 30*24*60*60*1000).toUTCString();
+    document.cookie = 'lga_utm='+v+'; expires='+exp+'; path=/; SameSite=Lax';
+  }
+  var freshUtm = readUtmFromUrl();
+  if (Object.keys(freshUtm).length) writeUtmCookie(freshUtm);
+  var utm = Object.assign({}, readUtmCookie(), freshUtm);
+
+  // --- Producto y variante seleccionada -------------------------------------
+  var product = {{ product | json }};
+
+  function selectedVariantId() {
+    var input = document.querySelector('form[action*="/cart/add"] [name="id"]');
+    if (input && input.value) return input.value;
+    if (product && product.variants) {
+      var av = product.variants.find(function(v){ return v.available; });
+      return av ? av.id : (product.variants[0] && product.variants[0].id);
+    }
+    return null;
+  }
+
+  btn.addEventListener('click', function () {
+    var variantId = selectedVariantId();
+    if (!product || !variantId) {
+      alert('Seleccioná una variante antes de continuar.');
+      return;
+    }
+    var variant = (product.variants || []).find(function(v){ return String(v.id) === String(variantId); })
+                || product.variants[0];
+
+    var qtyInput = document.querySelector('form[action*="/cart/add"] [name="quantity"]');
+    var qty = qtyInput ? Math.max(1, parseInt(qtyInput.value || '1', 10)) : 1;
+
+    var unitCents = variant.price || product.price || 0; // centavos
+    var params = new URLSearchParams({
+      shop: SHOP,
+      source: 'pdp',
+      product_id: String(product.id),
+      variant_id: String(variantId),
+      title: product.title || '',
+      handle: product.handle || '',
+      price: String(Math.round(unitCents)),
+      qty: String(qty),
+      cart_total: String(Math.round(unitCents * qty)),
+      ref: location.href
+    });
+    Object.keys(utm).forEach(function(k){ params.set(k, utm[k]); });
+
+    // Tracking opcional
+    try { if (window.gtag) window.gtag('event','lga_credit_click',{source:'pdp',product_id:product.id}); } catch(e){}
+    try { if (window.fbq)  window.fbq('trackCustom','LGACreditClick',{source:'pdp',product_id:product.id}); } catch(e){}
+
+    btn.disabled = true;
+    var labelSpan = btn.querySelector('.lga-credit-label');
+    if (labelSpan && labelSpan.firstChild) labelSpan.firstChild.textContent = 'Abriendo formulario…';
+    location.href = FORM_BASE + '?' + params.toString();
+  });
+})();
+</script>
+{% endunless %}

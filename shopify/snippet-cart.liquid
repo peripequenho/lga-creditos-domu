@@ -1,0 +1,114 @@
+{%- comment -%}
+  ============================================================================
+  LGA Credit Button — Cart version (cart page o cart drawer)
+  ----------------------------------------------------------------------------
+  CÓMO INSTALAR
+  Cart page:
+   1) Online Store → Themes → Customize.
+   2) Template selector → "Cart → Default cart".
+   3) Add section → "Custom Liquid".
+   4) Pegar este código completo.
+   5) Posicionar la sección antes o después del CTA "Checkout".
+   6) Save.
+
+  Cart drawer (si tu theme lo expone como template editable):
+   - Mismo proceso bajo "Cart drawer" en el selector de templates.
+   - Si tu theme NO permite Custom Liquid en el drawer, configurá el cart como
+     "Page" (Theme settings → Cart type → Page) y dejá el botón solo en la
+     página de carrito.
+  ============================================================================
+{%- endcomment -%}
+
+<div id="lga-credit-cart" class="lga-credit-wrap" data-context="cart">
+  <button type="button" class="lga-credit-btn" id="lga-credit-cart-trigger">
+    <span class="lga-credit-ico" aria-hidden="true">💳</span>
+    <span class="lga-credit-label">
+      Comprar todo en cuotas con LGA
+      <small>Total: <span id="lga-cart-total">${{ cart.total_price | money_without_currency }}</span> · hasta 24 cuotas</small>
+    </span>
+  </button>
+</div>
+
+<style>
+  #lga-credit-cart.lga-credit-wrap { margin: 12px 0 18px; }
+  #lga-credit-cart .lga-credit-btn {
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:14px 16px; background:#0F766E; color:#fff;
+    border:0; border-radius:10px; font: inherit; font-weight:600; font-size:16px;
+    cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.12);
+    transition: transform .08s ease, box-shadow .15s ease;
+  }
+  #lga-credit-cart .lga-credit-btn:hover  { box-shadow:0 4px 10px rgba(0,0,0,.18); }
+  #lga-credit-cart .lga-credit-btn:active { transform: translateY(1px); }
+  #lga-credit-cart .lga-credit-btn:disabled { opacity:.55; cursor:not-allowed; }
+  #lga-credit-cart .lga-credit-ico { font-size:22px; }
+  #lga-credit-cart .lga-credit-label { display:flex; flex-direction:column; text-align:left; }
+  #lga-credit-cart .lga-credit-label small { font-weight:400; font-size:12px; opacity:.9; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+  var FORM_BASE = 'https://creditos.domu.com.ar/aplicar';
+  var SHOP      = {{ shop.permanent_domain | json }};
+  var btn       = document.getElementById('lga-credit-cart-trigger');
+  if (!btn) return;
+
+  function readUtmFromUrl() {
+    var p = new URLSearchParams(location.search), u = {};
+    ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
+      var v = p.get(k); if (v) u[k] = v;
+    });
+    return u;
+  }
+  function readUtmCookie() {
+    var m = document.cookie.match(/(?:^|;\s*)lga_utm=([^;]+)/);
+    if (!m) return {};
+    try { return JSON.parse(decodeURIComponent(m[1])); } catch(e){ return {}; }
+  }
+  var utm = Object.assign({}, readUtmCookie(), readUtmFromUrl());
+
+  btn.addEventListener('click', async function () {
+    btn.disabled = true;
+    var cart;
+    try {
+      var res = await fetch('/cart.js', { credentials: 'same-origin' });
+      cart = await res.json();
+    } catch (e) {
+      alert('No pudimos leer el carrito. Refrescá la página e intentá de nuevo.');
+      btn.disabled = false; return;
+    }
+    if (!cart || !cart.items || !cart.items.length) {
+      alert('Tu carrito está vacío.');
+      btn.disabled = false; return;
+    }
+
+    var primary = cart.items[0];
+    var params = new URLSearchParams({
+      shop: SHOP,
+      source: cart.items.length === 1 ? 'cart_single' : 'cart_multi',
+      product_id: String(primary.product_id),
+      variant_id: String(primary.variant_id),
+      title: primary.product_title || '',
+      handle: primary.handle || '',
+      price: String(primary.price),                // centavos del primer item
+      qty: String(primary.quantity),
+      cart_total: String(cart.total_price),        // centavos total carrito
+      cart_token: cart.token || '',
+      cart_items: String(cart.items.length),
+      ref: location.href
+    });
+    if (cart.items.length > 1) {
+      params.set('cart_summary', cart.items.map(function(i){
+        return i.product_title + ' x' + i.quantity;
+      }).join(' | ').slice(0, 240));
+    }
+    Object.keys(utm).forEach(function(k){ params.set(k, utm[k]); });
+
+    try { if (window.gtag) window.gtag('event','lga_credit_click',{source:'cart',items:cart.items.length}); } catch(e){}
+    try { if (window.fbq)  window.fbq('trackCustom','LGACreditClick',{source:'cart',items:cart.items.length}); } catch(e){}
+
+    location.href = FORM_BASE + '?' + params.toString();
+  });
+})();
+</script>
