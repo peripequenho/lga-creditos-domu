@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const body = JSON.stringify(parsed.data);
   const ts = String(Math.floor(Date.now() / 1000));
-  const sig = await signHmac(N8N_SECRET, ts, body);
+  const sig = await signHmac(N8N_SECRET, ts, parsed.data.idempotency_key);
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
   const ua = req.headers.get('user-agent') ?? '';
