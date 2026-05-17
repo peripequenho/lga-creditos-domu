@@ -1,4 +1,8 @@
-# Estado actual del sistema — 2026-05-15
+# Estado actual del sistema — 2026-05-17
+
+> Migrado de Vercel → VPS Hostinger. Auto-deploy via webhook GitHub.
+
+
 
 ## Arquitectura productiva (all-cloud, 0 dependencia de tu PC)
 
