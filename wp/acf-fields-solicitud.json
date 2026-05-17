@@ -1,0 +1,133 @@
+[
+  {
+    "key": "group_lga_solicitud",
+    "title": "Datos de la solicitud",
+    "fields": [
+      { "key": "field_lga_tab_cliente", "label": "Cliente", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_first_name",  "label": "Nombre",   "name": "first_name", "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_last_name",   "label": "Apellido", "name": "last_name",  "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_dni",         "label": "DNI",      "name": "dni",        "type": "text", "show_in_rest": 1, "wrapper": {"width": "33"} },
+      { "key": "field_lga_birth_date",  "label": "Fecha de nacimiento", "name": "birth_date", "type": "date_picker", "display_format": "d/m/Y", "return_format": "Y-m-d", "show_in_rest": 1, "wrapper": {"width": "33"} },
+      { "key": "field_lga_phone",       "label": "Teléfono (E.164)", "name": "phone", "type": "text", "show_in_rest": 1, "wrapper": {"width": "34"} },
+      { "key": "field_lga_email",       "label": "Email",    "name": "email",      "type": "email", "show_in_rest": 1, "wrapper": {"width": "50"} },
+
+      { "key": "field_lga_tab_domicilio", "label": "Domicilio", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_address_line", "label": "Dirección", "name": "address_line", "type": "text", "show_in_rest": 1 },
+      { "key": "field_lga_locality",     "label": "Localidad", "name": "locality",     "type": "text", "show_in_rest": 1, "wrapper": {"width": "40"} },
+      { "key": "field_lga_province",     "label": "Provincia", "name": "province",     "type": "text", "show_in_rest": 1, "wrapper": {"width": "40"} },
+      { "key": "field_lga_postal_code",  "label": "Código postal", "name": "postal_code", "type": "text", "show_in_rest": 1, "wrapper": {"width": "20"} },
+      {
+        "key": "field_lga_housing_status", "label": "Tipo de vivienda", "name": "housing_status", "type": "select",
+        "choices": { "owned": "Propia", "rented": "Alquilada", "family": "Familiar / Cedida", "other": "Otra" },
+        "allow_null": 1, "show_in_rest": 1, "wrapper": {"width": "50"}
+      },
+
+      { "key": "field_lga_tab_ocupacion", "label": "Ocupación / Ingreso", "name": "", "type": "tab", "placement": "top" },
+
+      {
+        "key": "field_lga_occupation", "label": "Ocupación", "name": "occupation", "type": "select",
+        "choices": {
+          "employed_registered": "Empleado en relación de dependencia",
+          "self_employed_registered": "Monotributista / Autónomo",
+          "unregistered": "Trabajador en negro / informal",
+          "retired": "Jubilado / Pensionado",
+          "homemaker": "Ama de casa",
+          "student": "Estudiante",
+          "informal": "Changas / Cuenta propia",
+          "other": "Otra"
+        },
+        "allow_null": 1, "show_in_rest": 1
+      },
+      { "key": "field_lga_occupation_detail", "label": "Detalle ocupación", "name": "occupation_detail", "type": "text", "show_in_rest": 1 },
+      { "key": "field_lga_declared_income_ars", "label": "Ingreso declarado (ARS)", "name": "declared_income_ars", "type": "number", "min": 0, "show_in_rest": 1 },
+
+      { "key": "field_lga_tab_garante", "label": "Garante", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_guarantor_name",     "label": "Garante: Nombre",   "name": "guarantor_name",     "type": "text", "show_in_rest": 1 },
+      { "key": "field_lga_guarantor_phone",    "label": "Garante: Teléfono", "name": "guarantor_phone",    "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_guarantor_relation", "label": "Garante: Relación", "name": "guarantor_relation", "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+
+      { "key": "field_lga_tab_credito", "label": "Crédito solicitado", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_requested_amount_ars",   "label": "Monto solicitado (ARS)", "name": "requested_amount_ars",   "type": "number", "min": 0, "show_in_rest": 1, "wrapper": {"width": "33"} },
+      {
+        "key": "field_lga_payment_frequency", "label": "Frecuencia de pago", "name": "payment_frequency", "type": "select",
+        "choices": { "daily": "Diario", "weekly": "Semanal", "monthly": "Mensual" },
+        "allow_null": 1, "show_in_rest": 1, "wrapper": {"width": "33"}
+      },
+      { "key": "field_lga_requested_installments", "label": "Cantidad de cuotas",     "name": "requested_installments", "type": "number", "min": 1, "show_in_rest": 1, "wrapper": {"width": "34"} },
+      { "key": "field_lga_estimated_installment_ars", "label": "Cuota estimada (ARS)", "name": "estimated_installment_ars", "type": "number", "min": 0, "show_in_rest": 1, "wrapper": {"width": "50"} },
+
+      { "key": "field_lga_tab_estado", "label": "Estado", "name": "", "type": "tab", "placement": "top" },
+
+      {
+        "key": "field_lga_application_status", "label": "Estado de la solicitud", "name": "application_status", "type": "select",
+        "choices": {
+          "submitted": "Recibida",
+          "validating": "Validando",
+          "in_review": "En revisión",
+          "approved": "Aprobada",
+          "rejected": "Rechazada",
+          "cancelled": "Cancelada",
+          "expired": "Expirada"
+        },
+        "default_value": "submitted", "allow_null": 0, "show_in_rest": 1, "wrapper": {"width": "50"}
+      },
+      {
+        "key": "field_lga_zone_status", "label": "Estado de zona", "name": "zone_status", "type": "select",
+        "choices": {
+          "in_zone": "En zona",
+          "needs_review": "Revisar manualmente",
+          "out_of_zone": "Fuera de zona"
+        },
+        "allow_null": 1, "show_in_rest": 1, "wrapper": {"width": "50"}
+      },
+      { "key": "field_lga_internal_notes", "label": "Notas internas", "name": "internal_notes", "type": "textarea", "rows": 5, "show_in_rest": 1 },
+
+      { "key": "field_lga_tab_shopify", "label": "Origen Shopify", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_shop",           "label": "Shop",           "name": "shop",           "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_source",         "label": "Source",         "name": "source",         "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_product_id",     "label": "Product ID",     "name": "product_id",     "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_variant_id",     "label": "Variant ID",     "name": "variant_id",     "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_product_title",  "label": "Producto",       "name": "product_title",  "type": "text", "show_in_rest": 1 },
+      { "key": "field_lga_product_handle", "label": "Handle",         "name": "product_handle", "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_unit_price_ars", "label": "Precio unitario (ARS)", "name": "unit_price_ars", "type": "number", "min": 0, "show_in_rest": 1, "wrapper": {"width": "25"} },
+      { "key": "field_lga_quantity",       "label": "Cantidad",       "name": "quantity",       "type": "number", "min": 1, "show_in_rest": 1, "wrapper": {"width": "25"} },
+      { "key": "field_lga_cart_total_ars", "label": "Total carrito (ARS)", "name": "cart_total_ars", "type": "number", "min": 0, "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_cart_token",     "label": "Cart token",     "name": "cart_token",     "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_cart_summary",   "label": "Resumen carrito (multi-item)", "name": "cart_summary", "type": "textarea", "rows": 3, "show_in_rest": 1 },
+
+      { "key": "field_lga_tab_marketing", "label": "Marketing / Atribución", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_utm_source",   "label": "utm_source",   "name": "utm_source",   "type": "text", "show_in_rest": 1, "wrapper": {"width": "33"} },
+      { "key": "field_lga_utm_medium",   "label": "utm_medium",   "name": "utm_medium",   "type": "text", "show_in_rest": 1, "wrapper": {"width": "33"} },
+      { "key": "field_lga_utm_campaign", "label": "utm_campaign", "name": "utm_campaign", "type": "text", "show_in_rest": 1, "wrapper": {"width": "34"} },
+      { "key": "field_lga_utm_content",  "label": "utm_content",  "name": "utm_content",  "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_utm_term",     "label": "utm_term",     "name": "utm_term",     "type": "text", "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_referrer_url", "label": "Referrer URL", "name": "referrer_url", "type": "url",  "show_in_rest": 1 },
+      { "key": "field_lga_landing_url",  "label": "Landing URL",  "name": "landing_url",  "type": "url",  "show_in_rest": 1 },
+
+      { "key": "field_lga_tab_ids", "label": "IDs / Sync", "name": "", "type": "tab", "placement": "top" },
+
+      { "key": "field_lga_application_code", "label": "Código (LGA-XXXXXX-XXXX)", "name": "application_code", "type": "text", "readonly": 1, "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_application_id",   "label": "Application ID (Supabase)", "name": "application_id", "type": "text", "readonly": 1, "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_client_id",        "label": "Client ID (Supabase)",      "name": "client_id",      "type": "text", "readonly": 1, "show_in_rest": 1, "wrapper": {"width": "50"} },
+      { "key": "field_lga_supabase_synced_at", "label": "Sincronizado desde Supabase", "name": "supabase_synced_at", "type": "date_time_picker", "display_format": "d/m/Y H:i", "return_format": "Y-m-d H:i:s", "readonly": 1, "show_in_rest": 1, "wrapper": {"width": "50"} }
+    ],
+    "location": [
+      [{ "param": "post_type", "operator": "==", "value": "solicitud" }]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": ["the_content", "discussion", "comments"],
+    "active": true,
+    "description": "Campos sincronizados desde Supabase via n8n. application_status y internal_notes se editan a mano.",
+    "show_in_rest": 1
+  }
+]

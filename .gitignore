@@ -29,3 +29,8 @@ next-env.d.ts
 # n8n workflow exports (no commitear con credenciales)
 n8n/*.json
 !n8n/.gitkeep
+
+# WP credentials locales (passwords, application passwords)
+wp/credentials.local.md
+wp/*.local.md
+
