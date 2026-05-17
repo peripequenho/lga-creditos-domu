@@ -1,25 +1,28 @@
 {%- comment -%}
   ============================================================================
-  LGA Credit Button — Cart (versión secundaria / outline)
+  LGA Credit Button — Cart (cart-drawer + /cart page)
   ----------------------------------------------------------------------------
   Estilo subtle para NO competir con el CTA "Continuar con la compra".
-  Queda como opción alternativa, debajo del checkout normal.
+
+  Comportamiento clave:
+   · Se ESCONDE automáticamente cuando el cart está vacío.
+   · Se reaparece cuando agregás productos.
+   · Si por algún motivo el cart queda vacío al hacer click, muestra mensaje
+     INLINE (no alert) debajo del botón.
 
   CÓMO INSTALAR
-  Cart page:
-   1) Themes → Customize → "Cart → Default cart".
-   2) Add section → "Custom Liquid".
+  Cart drawer:
+   1) Themes → Customize → "Cart drawer" en el selector arriba.
+   2) Add block → "Custom Liquid".
    3) Pegar este código.
-   4) Posicionar DEBAJO del botón "Checkout" (Continuar con la compra).
+   4) Drag el bloque DEBAJO del botón "Checkout".
    5) Save.
 
-  Cart drawer:
-   1) Themes → Customize → "Cart drawer" en el selector.
-   2) Add block dentro de "Cart drawer" → "Custom Liquid".
-   3) Pegar este código.
-   4) IMPORTANTE: en el panel derecho del block, "Position" = "Cart footer".
-   5) Drag el bloque para que quede DEBAJO de "Checkout button".
-   6) Save.
+  Cart page (opcional, por si alguien va directo a /cart):
+   1) Themes → Customize → "Cart → Default cart".
+   2) Add section → "Custom Liquid".
+   3) Pegar este mismo código.
+   4) Save.
   ============================================================================
 {%- endcomment -%}
 
@@ -30,19 +33,26 @@
     <span class="lga-credit-ico" aria-hidden="true">💳</span>
     <span class="lga-credit-label">
       <strong>Pagar este carrito en cuotas con LGA</strong>
-      <small>Total: ${{ cart.total_price | money_without_currency }} · pago semanal, mensual o diario en efectivo · hasta 24 cuotas</small>
+      <small>Pago semanal, mensual o diario en efectivo · hasta 24 cuotas · solo Tucumán</small>
     </span>
     <span class="lga-credit-arrow" aria-hidden="true">›</span>
   </button>
 
+  <p class="lga-credit-msg" id="lga-credit-cart-msg" role="status" aria-live="polite"></p>
+
   <p class="lga-credit-help">
     Proceso aparte del checkout normal. LGA evalúa la solicitud y te contacta por WhatsApp.
-    Solo Tucumán.
   </p>
 </div>
 
 <style>
   #lga-credit-cart.lga-credit-wrap { margin: 16px 0 8px; }
+
+  /* Ocultar todo cuando el cart drawer está marcado como vacío por el theme. */
+  cart-drawer.is-empty #lga-credit-cart,
+  cart-drawer.drawer--empty #lga-credit-cart,
+  .template-cart.is-empty #lga-credit-cart,
+  body.cart-empty #lga-credit-cart { display: none !important; }
 
   #lga-credit-cart .lga-credit-divider {
     position: relative; text-align: center;
@@ -79,6 +89,21 @@
   #lga-credit-cart .lga-credit-label small  { font-weight: 400; font-size: 11.5px; color: #64748b; line-height: 1.35; }
   #lga-credit-cart .lga-credit-arrow { font-size: 22px; opacity: .5; flex-shrink: 0; }
 
+  #lga-credit-cart .lga-credit-msg {
+    display: none;
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    background: #FEF3C7;
+    border: 1px solid #FDE68A;
+    border-radius: 8px;
+    color: #92400E;
+    font-size: 12.5px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  #lga-credit-cart .lga-credit-msg.is-visible { display: block; }
+  #lga-credit-cart .lga-credit-msg.is-error   { background:#FEE2E2; border-color:#FCA5A5; color:#991B1B; }
+
   #lga-credit-cart .lga-credit-help {
     font-size: 11px; color: #94a3b8;
     margin: 8px 4px 0; text-align: center; line-height: 1.4;
@@ -91,8 +116,11 @@
   var FORM_BASE = 'https://creditos.domuhogar.com/aplicar';
   var SHOP      = {{ shop.permanent_domain | json }};
   var btn       = document.getElementById('lga-credit-cart-trigger');
-  if (!btn) return;
+  var msgEl     = document.getElementById('lga-credit-cart-msg');
+  var wrap      = document.getElementById('lga-credit-cart');
+  if (!btn || !wrap) return;
 
+  // --- UTM helpers ----------------------------------------------------------
   function readUtmFromUrl() {
     var p = new URLSearchParams(location.search), u = {};
     ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
@@ -107,47 +135,93 @@
   }
   var utm = Object.assign({}, readUtmCookie(), readUtmFromUrl());
 
-  btn.addEventListener('click', async function () {
+  // --- Mensajes inline ------------------------------------------------------
+  function showMsg(text, isError) {
+    if (!msgEl) return;
+    msgEl.textContent = text;
+    msgEl.classList.add('is-visible');
+    msgEl.classList.toggle('is-error', !!isError);
+  }
+  function hideMsg() {
+    if (!msgEl) return;
+    msgEl.classList.remove('is-visible', 'is-error');
+    msgEl.textContent = '';
+  }
+
+  // --- Visibility según cart count (defensa extra al CSS) -------------------
+  function syncVisibility(count) {
+    if (typeof count !== 'number') return;
+    wrap.style.display = (count > 0) ? '' : 'none';
+  }
+
+  // Cart sync inicial + listeners de updates del theme
+  function refreshCart() {
+    fetch('/cart.js', { credentials: 'same-origin', headers: {'Accept':'application/json'} })
+      .then(function(r){ return r.json(); })
+      .then(function(c){ syncVisibility(c && c.items ? c.items.length : 0); })
+      .catch(function(){});
+  }
+  refreshCart();
+
+  // Dawn-based themes disparan estos eventos al cambiar el cart
+  ['cart:update','cart:refresh','cart:added','cart:removed','cart-items:updated','cart-drawer:updated']
+    .forEach(function(ev){ document.addEventListener(ev, refreshCart); });
+
+  // Listener directo en cart-drawer custom element (Dawn)
+  var drawer = document.querySelector('cart-drawer');
+  if (drawer && 'MutationObserver' in window) {
+    new MutationObserver(refreshCart).observe(drawer, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // --- Click handler --------------------------------------------------------
+  btn.addEventListener('click', function () {
+    if (btn.disabled) return;
     btn.disabled = true;
-    var cart;
-    try {
-      var res = await fetch('/cart.js', { credentials: 'same-origin' });
-      cart = await res.json();
-    } catch (e) {
-      alert('No pudimos leer el carrito. Refrescá la página e intentá de nuevo.');
-      btn.disabled = false; return;
-    }
-    if (!cart || !cart.items || !cart.items.length) {
-      alert('Tu carrito está vacío.');
-      btn.disabled = false; return;
-    }
+    hideMsg();
 
-    var primary = cart.items[0];
-    var params = new URLSearchParams({
-      shop: SHOP,
-      source: cart.items.length === 1 ? 'cart_single' : 'cart_multi',
-      product_id: String(primary.product_id),
-      variant_id: String(primary.variant_id),
-      title: primary.product_title || '',
-      handle: primary.handle || '',
-      price: String(primary.price),
-      qty: String(primary.quantity),
-      cart_total: String(cart.total_price),
-      cart_token: cart.token || '',
-      cart_items: String(cart.items.length),
-      ref: location.href
-    });
-    if (cart.items.length > 1) {
-      params.set('cart_summary', cart.items.map(function(i){
-        return i.product_title + ' x' + i.quantity;
-      }).join(' | ').slice(0, 240));
-    }
-    Object.keys(utm).forEach(function(k){ params.set(k, utm[k]); });
+    fetch('/cart.js', { credentials: 'same-origin', headers: {'Accept':'application/json'} })
+      .then(function(r){ return r.json(); })
+      .then(function(cart){
+        if (!cart || !cart.items || !cart.items.length) {
+          showMsg('Tu carrito está vacío — agregá productos y volvé a tocar acá.', true);
+          syncVisibility(0);
+          btn.disabled = false;
+          return;
+        }
 
-    try { if (window.gtag) window.gtag('event','lga_credit_click',{source:'cart',items:cart.items.length}); } catch(e){}
-    try { if (window.fbq)  window.fbq('trackCustom','LGACreditClick',{source:'cart',items:cart.items.length}); } catch(e){}
+        var primary = cart.items[0];
+        var params = new URLSearchParams({
+          shop: SHOP,
+          source: cart.items.length === 1 ? 'cart_single' : 'cart_multi',
+          product_id: String(primary.product_id),
+          variant_id: String(primary.variant_id),
+          title: primary.product_title || '',
+          handle: primary.handle || '',
+          price: String(primary.price),
+          qty: String(primary.quantity),
+          cart_total: String(cart.total_price),
+          cart_token: cart.token || '',
+          cart_items: String(cart.items.length),
+          ref: location.href
+        });
+        if (cart.items.length > 1) {
+          params.set('cart_summary', cart.items.map(function(i){
+            return i.product_title + ' x' + i.quantity;
+          }).join(' | ').slice(0, 240));
+        }
+        Object.keys(utm).forEach(function(k){ params.set(k, utm[k]); });
 
-    location.href = FORM_BASE + '?' + params.toString();
+        try { if (window.gtag) window.gtag('event','lga_credit_click',{source:'cart',items:cart.items.length}); } catch(e){}
+        try { if (window.fbq)  window.fbq('trackCustom','LGACreditClick',{source:'cart',items:cart.items.length}); } catch(e){}
+
+        var labelStrong = btn.querySelector('.lga-credit-label strong');
+        if (labelStrong) labelStrong.textContent = 'Abriendo formulario…';
+        location.href = FORM_BASE + '?' + params.toString();
+      })
+      .catch(function(){
+        showMsg('No pudimos leer el carrito. Refrescá la página e intentá de nuevo.', true);
+        btn.disabled = false;
+      });
   });
 })();
 </script>
