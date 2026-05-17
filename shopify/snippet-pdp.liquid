@@ -125,6 +125,27 @@
     return null;
   }
 
+  function selectedQty() {
+    // El theme de Domu tiene quantity FUERA del form `/cart/add`.
+    // Probamos varios selectores en orden de especificidad.
+    var candidates = [
+      'form[action*="/cart/add"] input[name="quantity"]:not([type="hidden"])',
+      'input[name="quantity"]:not([type="hidden"])',
+      'select[name="quantity"]',
+      'quantity-input input[name="quantity"]',
+      '.quantity__input',
+      'input.quantity__input',
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      var el = document.querySelector(candidates[i]);
+      if (el && el.value) {
+        var n = parseInt(el.value, 10);
+        if (Number.isFinite(n) && n >= 1) return n;
+      }
+    }
+    return 1;
+  }
+
   btn.addEventListener('click', function () {
     var variantId = selectedVariantId();
     if (!product || !variantId) {
@@ -134,8 +155,7 @@
     var variant = (product.variants || []).find(function(v){ return String(v.id) === String(variantId); })
                 || product.variants[0];
 
-    var qtyInput = document.querySelector('form[action*="/cart/add"] [name="quantity"]');
-    var qty = qtyInput ? Math.max(1, parseInt(qtyInput.value || '1', 10)) : 1;
+    var qty = selectedQty();
 
     var unitCents = variant.price || product.price || 0; // centavos
     var params = new URLSearchParams({

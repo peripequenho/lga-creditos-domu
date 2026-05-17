@@ -84,7 +84,8 @@ export const applicationSchema = z.object({
   ]),
   occupation_detail: z.string().trim().max(140).optional().or(z.literal('')),
 
-  declared_income_ars: z.coerce.number().min(50_000, 'Ingreso mínimo $50.000').max(50_000_000),
+  // Sin mínimo durante testing
+  declared_income_ars: z.coerce.number().min(0).max(50_000_000),
 
   // ---- Garante (opcional) ----
   guarantor_name:     z.string().trim().max(120).optional().or(z.literal('')),
@@ -92,9 +93,10 @@ export const applicationSchema = z.object({
   guarantor_relation: z.string().trim().max(60).optional().or(z.literal('')),
 
   // ---- Solicitud crédito ----
+  // Sin mínimo durante etapa de testing (se reintroduce cuando definamos política de costos)
   requested_amount_ars: z.coerce
     .number()
-    .min(50_000, 'Mínimo $50.000')
+    .positive('El monto debe ser mayor a 0')
     .max(5_000_000, 'Máximo $5.000.000'),
 
   payment_frequency: z.enum(['daily', 'weekly', 'monthly']),

@@ -67,15 +67,15 @@ export function Step3Credit({ cartTotal }: { cartTotal: number }) {
         <FieldError message={errors.requested_amount_ars?.message} />
         <input
           type="range"
-          min={50_000}
-          max={cartTotal}
+          min={1_000}
+          max={Math.max(cartTotal, 1_000)}
           step={1_000}
-          value={amount}
+          value={amount || 0}
           onChange={(e) => setValue('requested_amount_ars', parseInt(e.target.value, 10), { shouldValidate: true })}
           className="w-full accent-lga-primary"
         />
         <div className="flex justify-between text-[10px] text-zinc-400">
-          <span>$50.000</span>
+          <span>$1.000</span>
           <span>{new Intl.NumberFormat('es-AR').format(cartTotal)}</span>
         </div>
       </div>
