@@ -169,11 +169,15 @@ export async function POST(req: NextRequest) {
       signal: AbortSignal.timeout(5_000),
     }).catch((e) => console.error('notify_failed', e?.message ?? e));
 
-    // 7) Push al dashboard WordPress (fire-and-forget). Si las env vars no están seteadas, no hace nada.
+    // 7) Push al dashboard WordPress. Si las env vars no están seteadas, no hace nada.
+    // IMPORTANTE: usar await acá (no fire-and-forget) porque Vercel serverless mata el
+    // container apenas retornamos la response, y el fetch en background queda colgado.
+    // Timeout 5s — si WP no responde rápido, log error y seguir (no rompe el flujo).
     const WP_URL = process.env.WP_REST_URL;        // ej: https://admin.lga-arg.com/wp-json/wp/v2/solicitudes
     const WP_AUTH = process.env.WP_REST_AUTH;       // base64 de "user:application_password"
     if (WP_URL && WP_AUTH) {
-      void fetch(WP_URL, {
+      try {
+        const wpRes = await fetch(WP_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,15 +243,19 @@ export async function POST(req: NextRequest) {
             supabase_synced_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
           },
         }),
-        signal: AbortSignal.timeout(8_000),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            const errText = await r.text().catch(() => '');
-            console.error('wp_push_non_ok', r.status, errText.slice(0, 300));
-          }
-        })
-        .catch((e) => console.error('wp_push_failed', e?.message ?? e));
+        signal: AbortSignal.timeout(5_000),
+        });
+        if (!wpRes.ok) {
+          const errText = await wpRes.text().catch(() => '');
+          console.error('wp_push_non_ok', wpRes.status, errText.slice(0, 300));
+        } else {
+          const wpJson = await wpRes.json().catch(() => null);
+          console.log('wp_push_ok', { wp_id: wpJson?.id, code: app.application_code });
+        }
+      } catch (e) {
+        const err = e as { message?: string };
+        console.error('wp_push_failed', err.message ?? e);
+      }
     }
 
     return NextResponse.json(
