@@ -147,6 +147,28 @@ export async function POST(req: NextRequest) {
       )
     `.catch((e) => console.error('event_insert_failed', e?.message ?? e));
 
+    // 6) Notificar al equipo via Telegram (fire-and-forget, no bloquea el response al cliente)
+    const NOTIFY_URL = process.env.N8N_NOTIFY_URL || 'https://n8n.lga-arg.com/webhook/lga-new-application-notify';
+    void fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        application_code: app.application_code,
+        application_id: app.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        dni: p.dni,
+        phone: p.phone,
+        requested_amount_ars: p.requested_amount_ars,
+        requested_installments: p.requested_installments,
+        payment_frequency: p.payment_frequency,
+        locality: p.locality,
+        province: p.province,
+        zone_status: zone.status,
+      }),
+      signal: AbortSignal.timeout(5_000),
+    }).catch((e) => console.error('notify_failed', e?.message ?? e));
+
     return NextResponse.json(
       {
         ok: true,
