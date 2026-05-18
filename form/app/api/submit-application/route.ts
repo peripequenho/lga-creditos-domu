@@ -147,116 +147,75 @@ export async function POST(req: NextRequest) {
       )
     `.catch((e) => console.error('event_insert_failed', e?.message ?? e));
 
-    // 6) Notificar al equipo via Telegram (fire-and-forget, no bloquea el response al cliente)
+    // 6) Notificar al equipo via n8n VPS (workflow dispara Telegram + push a WP dashboard).
+    // Payload completo: el notify workflow ahora hace 2 cosas (notif Telegram + crear post en WP).
     const NOTIFY_URL = process.env.N8N_NOTIFY_URL || 'https://n8n.lga-arg.com/webhook/lga-new-application-notify';
     void fetch(NOTIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        // IDs
         application_code: app.application_code,
         application_id: app.id,
+        client_id: clientId,
+        // Cliente
         first_name: p.first_name,
         last_name: p.last_name,
         dni: p.dni,
+        birth_date: p.birth_date,
         phone: p.phone,
-        requested_amount_ars: p.requested_amount_ars,
-        requested_installments: p.requested_installments,
-        payment_frequency: p.payment_frequency,
+        email: p.email || '',
+        // Domicilio
+        address_line: p.address_line,
         locality: p.locality,
         province: p.province,
+        postal_code: p.postal_code,
+        housing_status: p.housing_status,
+        // Ocupación
+        occupation: p.occupation,
+        occupation_detail: p.occupation_detail || '',
+        declared_income_ars: p.declared_income_ars,
+        // Garante
+        guarantor_name: p.guarantor_name || '',
+        guarantor_phone: p.guarantor_phone || '',
+        guarantor_relation: p.guarantor_relation || '',
+        // Crédito
+        requested_amount_ars: p.requested_amount_ars,
+        payment_frequency: p.payment_frequency,
+        requested_installments: p.requested_installments,
+        estimated_installment_ars: p.estimated_installment_ars || 0,
+        // Estado
+        application_status: 'submitted',
         zone_status: zone.status,
+        // Shopify
+        shop: p.shop,
+        source: p.source || '',
+        product_id: p.product_id || '',
+        variant_id: p.variant_id || '',
+        product_title: p.product_title || '',
+        product_handle: p.product_handle || '',
+        unit_price_ars: p.unit_price_ars || 0,
+        quantity: p.quantity || 1,
+        cart_token: p.cart_token || '',
+        cart_total_ars: p.cart_total_ars,
+        cart_summary: p.cart_summary || '',
+        // Marketing
+        utm_source: p.utm_source || '',
+        utm_medium: p.utm_medium || '',
+        utm_campaign: p.utm_campaign || '',
+        utm_content: p.utm_content || '',
+        utm_term: p.utm_term || '',
+        referrer_url: p.referrer_url || '',
+        landing_url: p.landing_url || '',
       }),
       signal: AbortSignal.timeout(5_000),
     }).catch((e) => console.error('notify_failed', e?.message ?? e));
 
-    // 7) Push al dashboard WordPress. Si las env vars no están seteadas, no hace nada.
-    // IMPORTANTE: usar await acá (no fire-and-forget) porque Vercel serverless mata el
-    // container apenas retornamos la response, y el fetch en background queda colgado.
-    // Timeout 5s — si WP no responde rápido, log error y seguir (no rompe el flujo).
-    const WP_URL = process.env.WP_REST_URL;        // ej: https://admin.lga-arg.com/wp-json/wp/v2/solicitudes
-    const WP_AUTH = process.env.WP_REST_AUTH;       // base64 de "user:application_password"
-    if (WP_URL && WP_AUTH) {
-      try {
-        const wpRes = await fetch(WP_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${WP_AUTH}`,
-        },
-        body: JSON.stringify({
-          title: app.application_code,
-          status: 'publish',
-          acf: {
-            // Cliente
-            first_name: p.first_name,
-            last_name: p.last_name,
-            dni: p.dni,
-            birth_date: p.birth_date,
-            phone: p.phone,
-            email: p.email || '',
-            // Domicilio
-            address_line: p.address_line,
-            locality: p.locality,
-            province: p.province,
-            postal_code: p.postal_code,
-            housing_status: p.housing_status,
-            // Ocupación
-            occupation: p.occupation,
-            occupation_detail: p.occupation_detail || '',
-            declared_income_ars: p.declared_income_ars,
-            // Garante
-            guarantor_name: p.guarantor_name || '',
-            guarantor_phone: p.guarantor_phone || '',
-            guarantor_relation: p.guarantor_relation || '',
-            // Crédito
-            requested_amount_ars: p.requested_amount_ars,
-            payment_frequency: p.payment_frequency,
-            requested_installments: p.requested_installments,
-            estimated_installment_ars: p.estimated_installment_ars || 0,
-            // Estado
-            application_status: 'submitted',
-            zone_status: zone.status,
-            // Shopify
-            shop: p.shop,
-            source: p.source || '',
-            product_id: p.product_id || '',
-            variant_id: p.variant_id || '',
-            product_title: p.product_title || '',
-            product_handle: p.product_handle || '',
-            unit_price_ars: p.unit_price_ars || 0,
-            quantity: p.quantity || 1,
-            cart_token: p.cart_token || '',
-            cart_total_ars: p.cart_total_ars,
-            cart_summary: p.cart_summary || '',
-            // Marketing
-            utm_source: p.utm_source || '',
-            utm_medium: p.utm_medium || '',
-            utm_campaign: p.utm_campaign || '',
-            utm_content: p.utm_content || '',
-            utm_term: p.utm_term || '',
-            referrer_url: p.referrer_url || '',
-            landing_url: p.landing_url || '',
-            // IDs
-            application_code: app.application_code,
-            application_id: app.id,
-            client_id: clientId,
-            supabase_synced_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
-          },
-        }),
-        signal: AbortSignal.timeout(5_000),
-        });
-        if (!wpRes.ok) {
-          const errText = await wpRes.text().catch(() => '');
-          console.error('wp_push_non_ok', wpRes.status, errText.slice(0, 300));
-        } else {
-          const wpJson = await wpRes.json().catch(() => null);
-          console.log('wp_push_ok', { wp_id: wpJson?.id, code: app.application_code });
-        }
-      } catch (e) {
-        const err = e as { message?: string };
-        console.error('wp_push_failed', err.message ?? e);
-      }
-    }
+    // 7) Push al dashboard WordPress: lo hace el workflow n8n VPS que recibe
+    // el webhook lga-new-application-notify (mismo que dispara Telegram).
+    // Antes había acá un fetch directo desde Vercel a WP REST, pero Vercel
+    // tenía problemas inyectando las env vars al runtime. Centralizar todo
+    // en n8n VPS es más mantenible y desacopla el form de WordPress.
 
     return NextResponse.json(
       {
