@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'LGA_CRM_VERSION', '0.1.3' );
+define( 'LGA_CRM_VERSION', '0.2.0' );
 define( 'LGA_CRM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LGA_CRM_URL', plugin_dir_url( __FILE__ ) );
 

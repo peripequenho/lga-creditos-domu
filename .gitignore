@@ -34,3 +34,7 @@ n8n/*.json
 wp/credentials.local.md
 wp/*.local.md
 
+# Cualquier archivo *.local.* (passwords, accesos, secretos)
+*.local.txt
+*.local.md
+

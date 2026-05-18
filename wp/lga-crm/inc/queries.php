@@ -216,30 +216,39 @@ function lga_crm_label( $key, $value ) {
 }
 
 /**
- * Helper: badge HTML coloreado según status.
+ * Helper: badge HTML estilo shadcn (con dot color + ring inset).
  */
 function lga_crm_badge( $key, $value ) {
-    $colors = array(
+    // Estilo shadcn: bg/10 + text-color + ring-color/20
+    $styles = array(
         'lead_status' => array(
-            'nuevo' => 'bg-blue-100 text-blue-800', 'en_visita' => 'bg-yellow-100 text-yellow-800',
-            'aprobado' => 'bg-green-100 text-green-800', 'rechazado' => 'bg-red-100 text-red-800',
-            'perdido' => 'bg-gray-100 text-gray-800',
+            'nuevo'      => 'bg-blue-50 text-blue-700 ring-blue-700/10',
+            'en_visita'  => 'bg-amber-50 text-amber-700 ring-amber-700/10',
+            'aprobado'   => 'bg-emerald-50 text-emerald-700 ring-emerald-700/10',
+            'rechazado'  => 'bg-red-50 text-red-700 ring-red-700/10',
+            'perdido'    => 'bg-zinc-100 text-zinc-700 ring-zinc-600/10',
         ),
         'credit_status' => array(
-            'pendiente_aprobacion' => 'bg-yellow-100 text-yellow-800', 'activo' => 'bg-blue-100 text-blue-800',
-            'al_dia' => 'bg-green-100 text-green-800', 'en_mora' => 'bg-red-100 text-red-800',
-            'pagado' => 'bg-emerald-100 text-emerald-800', 'cancelado' => 'bg-gray-100 text-gray-800',
+            'pendiente_aprobacion' => 'bg-amber-50 text-amber-700 ring-amber-700/10',
+            'activo'     => 'bg-blue-50 text-blue-700 ring-blue-700/10',
+            'al_dia'     => 'bg-emerald-50 text-emerald-700 ring-emerald-700/10',
+            'en_mora'    => 'bg-red-50 text-red-700 ring-red-700/10',
+            'pagado'     => 'bg-teal-50 text-teal-700 ring-teal-700/10',
+            'cancelado'  => 'bg-zinc-100 text-zinc-700 ring-zinc-600/10',
         ),
         'client_status' => array(
-            'lead' => 'bg-blue-100 text-blue-800', 'activo' => 'bg-green-100 text-green-800',
-            'bloqueado' => 'bg-red-100 text-red-800', 'archivado' => 'bg-gray-100 text-gray-800',
+            'lead'       => 'bg-blue-50 text-blue-700 ring-blue-700/10',
+            'activo'     => 'bg-emerald-50 text-emerald-700 ring-emerald-700/10',
+            'bloqueado'  => 'bg-red-50 text-red-700 ring-red-700/10',
+            'archivado'  => 'bg-zinc-100 text-zinc-700 ring-zinc-600/10',
         ),
         'zone_status' => array(
-            'in_zone' => 'bg-green-100 text-green-800', 'needs_review' => 'bg-yellow-100 text-yellow-800',
-            'out_of_zone' => 'bg-red-100 text-red-800',
+            'in_zone'      => 'bg-emerald-50 text-emerald-700 ring-emerald-700/10',
+            'needs_review' => 'bg-amber-50 text-amber-700 ring-amber-700/10',
+            'out_of_zone'  => 'bg-red-50 text-red-700 ring-red-700/10',
         ),
     );
-    $color = $colors[ $key ][ $value ] ?? 'bg-gray-100 text-gray-800';
+    $cls = $styles[ $key ][ $value ] ?? 'bg-zinc-100 text-zinc-700 ring-zinc-600/10';
     $label = lga_crm_label( $key, $value );
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' . esc_attr( $color ) . '">' . esc_html( $label ) . '</span>';
+    return '<span class="lga-badge ring-1 ring-inset ' . esc_attr( $cls ) . '">' . esc_html( $label ) . '</span>';
 }
