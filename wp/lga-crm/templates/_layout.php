@@ -380,27 +380,45 @@ function lga_crm_layout_close() {
  */
 function lga_crm_flash() {
     $msg_codes = array(
-        'created'         => array( 'green',  'Creado correctamente.' ),
-        'updated'         => array( 'green',  'Actualizado.' ),
-        'converted'       => array( 'green',  'Solicitud convertida en lead.' ),
-        'promoted'        => array( 'green',  'Lead promovido a cliente con crédito.' ),
-        'already_converted' => array( 'yellow', 'Esta solicitud ya estaba convertida.' ),
-        'existing'        => array( 'yellow', 'Ya existe un cliente con ese DNI.' ),
+        'created'           => array( 'green',  'Creado correctamente.' ),
+        'updated'           => array( 'green',  'Actualizado.' ),
+        'converted'         => array( 'green',  'Solicitud convertida a lead.' ),
+        'promoted'          => array( 'green',  'Lead aprobado — cliente y crédito creados.' ),
+        'already_converted' => array( 'yellow', 'Esta solicitud ya estaba convertida (te llevamos al lead existente).' ),
+        'existing'          => array( 'yellow', 'Ya existe un cliente con ese DNI.' ),
     );
     $err_codes = array(
         'missing_required' => array( 'red', 'Faltan campos obligatorios.' ),
         'invalid_amounts'  => array( 'red', 'Montos o cuotas inválidos.' ),
+        'promote_failed'   => array( 'red', 'No se pudo promover el lead (revisar DNI y campos).' ),
     );
 
     $msg = sanitize_key( $_GET['msg'] ?? '' );
     $err = sanitize_key( $_GET['err'] ?? '' );
+    $new = (int) ( $_GET['new'] ?? 0 );
+
+    $tone_classes = array(
+        'green'  => 'bg-emerald-50 text-emerald-800 ring-emerald-700/10 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+        'yellow' => 'bg-amber-50 text-amber-800 ring-amber-700/10 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+        'red'    => 'bg-red-50 text-red-800 ring-red-700/10 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20',
+    );
 
     if ( $msg && isset( $msg_codes[ $msg ] ) ) {
         list( $color, $text ) = $msg_codes[ $msg ];
-        echo '<div class="mb-4 p-3 rounded-md bg-' . esc_attr( $color ) . '-50 text-' . esc_attr( $color ) . '-800 border border-' . esc_attr( $color ) . '-200">' . esc_html( $text ) . '</div>';
+        $cls = $tone_classes[ $color ] ?? '';
+        $link = '';
+        if ( $new > 0 ) {
+            $pt = get_post_type( $new );
+            if ( $pt ) {
+                $url = home_url( '/' . $pt . '/' . $new . '/' );
+                $link = ' <a href="' . esc_url( $url ) . '" class="font-semibold underline ml-2">Ver →</a>';
+            }
+        }
+        echo '<div class="mb-6 p-3 rounded-md ring-1 ring-inset ' . esc_attr( $cls ) . '">' . esc_html( $text ) . $link . '</div>';
     }
     if ( $err && isset( $err_codes[ $err ] ) ) {
         list( $color, $text ) = $err_codes[ $err ];
-        echo '<div class="mb-4 p-3 rounded-md bg-' . esc_attr( $color ) . '-50 text-' . esc_attr( $color ) . '-800 border border-' . esc_attr( $color ) . '-200">' . esc_html( $text ) . '</div>';
+        $cls = $tone_classes[ $color ] ?? '';
+        echo '<div class="mb-6 p-3 rounded-md ring-1 ring-inset ' . esc_attr( $cls ) . '">' . esc_html( $text ) . '</div>';
     }
 }

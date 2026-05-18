@@ -55,12 +55,16 @@ function lga_crm_filter_by_role( $query ) {
 
 /**
  * Listar leads del current user (o todos si admin).
+ * Por default oculta los terminales (aprobado/rechazado/perdido) — pasalos
+ * con $args['include_closed' => true] para incluirlos.
  */
 function lga_crm_get_leads_for_user( $user_id = null, $args = array() ) {
     if ( $user_id === null ) {
         $user_id = get_current_user_id();
     }
     $is_admin = user_can( $user_id, 'manage_options' );
+    $include_closed = ! empty( $args['include_closed'] );
+    unset( $args['include_closed'] );
 
     $defaults = array(
         'post_type'      => 'lead',
@@ -71,11 +75,26 @@ function lga_crm_get_leads_for_user( $user_id = null, $args = array() ) {
     );
     $q = wp_parse_args( $args, $defaults );
 
+    // Filtros meta combinados
+    $meta_filters = array( 'relation' => 'AND' );
+
     if ( ! $is_admin ) {
-        $q['meta_query'] = array(
-            array( 'key' => 'responsable', 'value' => $user_id, 'compare' => '=' ),
+        $meta_filters[] = array( 'key' => 'responsable', 'value' => $user_id, 'compare' => '=' );
+    }
+
+    if ( ! $include_closed ) {
+        // Excluir leads terminales (aprobado / rechazado / perdido)
+        $meta_filters[] = array(
+            'relation' => 'OR',
+            array( 'key' => 'lead_status', 'compare' => 'NOT EXISTS' ),
+            array( 'key' => 'lead_status', 'value' => array( 'nuevo', 'en_visita' ), 'compare' => 'IN' ),
         );
     }
+
+    if ( count( $meta_filters ) > 1 ) {
+        $q['meta_query'] = $meta_filters;
+    }
+
     return get_posts( $q );
 }
 
@@ -146,7 +165,9 @@ function lga_crm_get_creditos_for_user( $user_id = null, $args = array() ) {
 }
 
 /**
- * Listar solicitudes pendientes (no convertidas todavía).
+ * Listar solicitudes pendientes (= recién entraron, sin convertir).
+ * Cuando se convierten a lead, application_status pasa a 'in_review' y se
+ * ocultan de este listado.
  */
 function lga_crm_get_pending_solicitudes( $args = array() ) {
     $defaults = array(
@@ -157,7 +178,7 @@ function lga_crm_get_pending_solicitudes( $args = array() ) {
         'post_status'    => array( 'publish' ),
         'meta_query'     => array(
             'relation' => 'OR',
-            array( 'key' => 'application_status', 'value' => array( 'submitted', 'in_review', 'validating' ), 'compare' => 'IN' ),
+            array( 'key' => 'application_status', 'value' => 'submitted', 'compare' => '=' ),
             array( 'key' => 'application_status', 'compare' => 'NOT EXISTS' ),
         ),
     );

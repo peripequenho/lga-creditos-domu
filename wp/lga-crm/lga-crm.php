@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'LGA_CRM_VERSION', '0.2.1' );
+define( 'LGA_CRM_VERSION', '0.2.2' );
 define( 'LGA_CRM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LGA_CRM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -60,6 +60,22 @@ function lga_crm_bootstrap() {
             update_option( 'lga_crm_rewrite_v', LGA_CRM_VERSION );
         }
     }, 99 );
+
+    // Excluir todas las rutas LGA del LiteSpeed Cache.
+    // Sin esto, el HTML de los paneles se cacheaba por URL y mostraba estados viejos
+    // después de aprobar/promover/crear (y el toggle dark se "perdía" en algunas rutas).
+    add_action( 'template_redirect', function () {
+        if ( ! lga_crm_is_lga_page() ) return;
+        // Filter API oficial de LiteSpeed Cache plugin
+        add_filter( 'litespeed_control_no_cache', '__return_true' );
+        // Header crudo para LSWS standalone (sin plugin)
+        if ( ! headers_sent() ) {
+            header( 'Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0', true );
+            header( 'X-LiteSpeed-Cache-Control: no-cache' );
+            header( 'Pragma: no-cache' );
+            header( 'Expires: 0' );
+        }
+    }, 1 );
 
     // Enqueue assets (Tailwind CDN para velocidad)
     add_action( 'wp_enqueue_scripts', function () {
