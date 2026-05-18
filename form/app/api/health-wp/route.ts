@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Endpoint debug temporal. NO loggear los valores, solo si están seteadas.
+// Endpoint debug temporal v2. NO loggear los valores, solo si están seteadas.
 export async function GET() {
   const WP_URL = process.env.WP_REST_URL;
   const WP_AUTH = process.env.WP_REST_AUTH;
