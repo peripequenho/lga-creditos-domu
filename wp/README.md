@@ -5,19 +5,25 @@ Dashboard interno para gestionar solicitudes de crédito. Vive en **`admin.lga-a
 ## Arquitectura
 
 ```
-Form Next.js (creditos.domuhogar.com)
+Form Next.js (creditos.domuhogar.com — Vercel)
    ↓ POST /api/submit-application
+   ├── Insert credit_applications + clients + events en Supabase (sync)
+   └── POST notify webhook → n8n VPS (fire-and-forget)
 n8n VPS (n8n.lga-arg.com)
-   ├── Insert credit_applications en Supabase
-   ├── Insert application_events
-   ├── Notify Telegram al grupo LGA
-   └── POST /wp-json/wp/v2/solicitudes        ← NUEVO (integración pendiente)
+   Workflow yDWVVlQxopOrclT6 · "LGA - Notificar nueva solicitud (Telegram)"
+   ├── Webhook nueva solicitud
+   ├── Branch A: Formatear mensaje → Enviar Telegram → Respond OK
+   └── Branch B: Mapear ACF → Crear post WP
 WordPress (admin.lga-arg.com)
    └── CPT "solicitud" con 47 campos ACF
        Editable manualmente desde wp-admin
 ```
 
 WordPress es la **vista editable** del equipo. Supabase queda como source-of-truth técnico; el equipo no técnico solo toca WP.
+
+**Por qué n8n VPS hace el push (no Vercel directo):**
+- Las env vars `WP_REST_URL` / `WP_REST_AUTH` en Vercel no se inyectaban al runtime de la Function por un bug raro (probablemente cache de dominio custom). Las funciones SÍ veían DATABASE_URL pero no las nuevas.
+- Centralizando el push en n8n: cero env vars nuevas en Vercel, una sola edición en n8n para cambiar mapping/auth WP, el form Next.js no se entera de la existencia de WordPress.
 
 ## Stack instalado
 
@@ -65,7 +71,19 @@ POST https://admin.lga-arg.com/wp-json/wp/v2/solicitudes
 Authorization: Basic base64(gerolopezge@gmail.com:<application_password>)
 ```
 
-La Application Password se guarda en n8n como credencial `httpHeaderAuth` (no commitear; ver `.wp.env.local` fuera del repo).
+El header Authorization se setea **directamente en el nodo HTTP Request** de n8n (no usa credential).
+La auth completa vive en el nodo "Crear post WP" del workflow `yDWVVlQxopOrclT6`.
+
+### Nodos del workflow
+
+| Nodo | Tipo | Rol |
+|---|---|---|
+| Webhook nueva solicitud | webhook | Recibe POST del form |
+| Formatear mensaje | code | Arma el texto MarkdownV2 para Telegram |
+| Enviar Telegram | httpRequest | POST a Telegram Bot API (supergroup `-1003766295782`) |
+| Respond OK | respondToWebhook | 200 al form Next.js |
+| Mapear ACF | code | Transforma el payload del webhook a `{ title, status, acf: {...47 campos} }` |
+| Crear post WP | httpRequest | POST al endpoint REST del CPT `solicitud` |
 
 ### Payload de ejemplo
 ```json
@@ -112,18 +130,10 @@ La Application Password se guarda en n8n como credencial `httpHeaderAuth` (no co
 ```
 
 ### Validación end-to-end
-Probado el 2026-05-17 con curl + Application Password. POST con `acf: {...}` persiste los 47 campos. PATCH para updates funciona igual.
-
-## Próximo paso
-
-Agregar al final del workflow `LGA - Nueva solicitud crédito Domu` en n8n VPS:
-
-1. Nodo `HTTP Request — POST WP solicitud`
-2. URL: `https://admin.lga-arg.com/wp-json/wp/v2/solicitudes`
-3. Method: POST
-4. Auth: `Basic Auth` o `httpHeaderAuth` con credencial "WP Admin LGA"
-5. Body JSON construido desde el payload de Supabase + agregando `title: {{application_code}}` y `acf: { ... mapping ... }`
-6. Retry policy: 3x con backoff
+Probado el 2026-05-17:
+- Submit del form Next.js productivo (LGA-260517-0013) → fila Supabase ✓ + post WP creado automático ✓ + Telegram al supergroup ✓
+- Workflow exec 30 status: success
+- Latencia agregada: ~1.5s (n8n VPS responde rápido)
 
 ## Operación manual
 
