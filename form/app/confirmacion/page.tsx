@@ -37,13 +37,13 @@ export default function ConfirmacionPage({ searchParams }: { searchParams: Searc
   const c = copyByZone(zone);
 
   const toneCls =
-    c.tone === 'ok' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' :
-    c.tone === 'warn' ? 'border-amber-200 bg-amber-50 text-amber-900' :
-    'border-zinc-200 bg-zinc-50 text-zinc-900';
+    c.tone === 'ok' ? 'border-border-color bg-surface text-state-ok' :
+    c.tone === 'warn' ? 'border-state-warn/40 bg-surface text-state-warn' :
+    'border-border-color bg-surface text-fg-primary';
 
   return (
     <section className="space-y-4">
-      <div className={`rounded-xl border p-6 ${toneCls}`}>
+      <div className={`rounded border p-6 ${toneCls}`}>
         <h1 className="text-2xl font-semibold">{c.title}</h1>
         {code && (
           <p className="mt-2 text-sm">
@@ -52,7 +52,7 @@ export default function ConfirmacionPage({ searchParams }: { searchParams: Searc
         )}
         <p className="mt-2">{c.body}</p>
       </div>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-fg-muted">
         Si no recibís contacto en 24 hs hábiles, escribinos al WhatsApp {WA}.
       </p>
       <p>

@@ -6,8 +6,8 @@ import type { ApplicationInput } from '@/lib/schema';
 import { HOUSING_OPTIONS, OCCUPATION_OPTIONS } from '@/lib/schema';
 import { FieldError } from '../FieldError';
 
-const input = 'w-full rounded-md border border-zinc-300 px-3 py-2.5 text-zinc-900 shadow-sm focus:border-lga-primary focus:ring-1 focus:ring-lga-primary outline-none text-base';
-const label = 'block text-sm font-medium text-zinc-700 mb-1';
+const input = 'w-full rounded-md border border-border-color px-3 py-2.5 text-fg-primary focus:border-lga-primary focus:ring-1 focus:ring-lga-primary outline-none text-base';
+const label = 'block text-sm font-medium text-fg-primary mb-1';
 
 function fmtMoneyInput(v: string): string {
   const digits = v.replace(/\D/g, '');
@@ -24,12 +24,12 @@ export function Step2Address() {
   return (
     <div className="space-y-5">
       <header>
-        <h2 className="text-xl font-semibold text-zinc-900">Domicilio y situación</h2>
-        <p className="text-sm text-zinc-600 mt-1">Dónde vivís y qué hacés. Lo usamos para evaluar tu solicitud.</p>
+        <h2 className="text-xl font-semibold text-fg-primary">Domicilio y situación</h2>
+        <p className="text-sm text-fg-secondary mt-1">Dónde vivís y qué hacés. Lo usamos para evaluar tu solicitud.</p>
       </header>
 
-      <fieldset className="space-y-4 rounded-xl border border-zinc-200 p-4">
-        <legend className="px-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Dirección</legend>
+      <fieldset className="space-y-4 rounded border border-border-color p-4">
+        <legend className="px-2 text-xs font-semibold text-fg-muted uppercase tracking-wider">Dirección</legend>
 
         <div>
           <label className={label}>Calle y número</label>
@@ -81,8 +81,8 @@ export function Step2Address() {
         </div>
       </fieldset>
 
-      <fieldset className="space-y-4 rounded-xl border border-zinc-200 p-4">
-        <legend className="px-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ocupación e ingresos</legend>
+      <fieldset className="space-y-4 rounded border border-border-color p-4">
+        <legend className="px-2 text-xs font-semibold text-fg-muted uppercase tracking-wider">Ocupación e ingresos</legend>
 
         <div>
           <label className={label}>¿A qué te dedicás?</label>
@@ -95,7 +95,7 @@ export function Step2Address() {
 
         <div>
           <label className={label}>
-            Detalle de la actividad <span className="text-zinc-400 font-normal">(opcional)</span>
+            Detalle de la actividad <span className="text-fg-muted font-normal">(opcional)</span>
           </label>
           <input
             className={input}
@@ -108,7 +108,7 @@ export function Step2Address() {
         <div>
           <label className={label}>Ingreso mensual aproximado (AR$)</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted">$</span>
             <input
               className={input + ' pl-7'}
               inputMode="numeric"
@@ -121,26 +121,26 @@ export function Step2Address() {
             />
           </div>
           <FieldError message={errors.declared_income_ars?.message} />
-          <p className="text-xs text-zinc-500 mt-1">Es lo que entra a casa entre todos los ingresos. Estimado, no hace falta exacto.</p>
+          <p className="text-xs text-fg-muted mt-1">Es lo que entra a casa entre todos los ingresos. Estimado, no hace falta exacto.</p>
         </div>
       </fieldset>
 
       {/* Garante opcional, colapsable */}
-      <fieldset className="rounded-xl border border-zinc-200 p-4">
+      <fieldset className="rounded border border-border-color p-4">
         <button
           type="button"
           onClick={() => setGarante(!garante)}
-          className="w-full flex items-center justify-between text-sm font-medium text-zinc-700"
+          className="w-full flex items-center justify-between text-sm font-medium text-fg-primary"
         >
           <span>
-            Garante o referencia personal <span className="text-zinc-400 font-normal">(opcional)</span>
+            Garante o referencia personal <span className="text-fg-muted font-normal">(opcional)</span>
           </span>
-          <span className="text-zinc-400">{garante ? '−' : '+'}</span>
+          <span className="text-fg-muted">{garante ? '−' : '+'}</span>
         </button>
 
         {garante && (
           <div className="mt-4 space-y-4">
-            <p className="text-xs text-zinc-500 -mt-1">
+            <p className="text-xs text-fg-muted -mt-1">
               Si tenés alguien que puede dar referencias tuyas (familiar, empleador, conocido), cargá sus datos. Acelera la aprobación.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

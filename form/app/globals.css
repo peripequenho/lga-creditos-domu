@@ -3,11 +3,39 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+
+  /* LGA Command palette — kept in sync with lga-design-system */
+  --bg-base:        #080A0C;
+  --bg-secondary:   #0E1114;
+  --surface:        #15191E;
+  --surface-raised: #1B2026;
+  --border-color:   #2A3038;
+  --fg-primary:     #F4F1EA;
+  --fg-secondary:   #B8B2A7;
+  --fg-muted:       #7E8790;
+  --accent-bone:    #E8E3D8;
+  --accent-steel:   #5E7184;
+  --accent-olive:   #5F6B58;
+  --state-ok:       #4F8A5B;
+  --state-warn:     #C1843A;
+  --state-risk:     #A6403A;
+  --state-crit:     #7E2525;
+  --state-info:     #5E7184;
 }
 
-html, body {
-  background: #ffffff;
-  color: #0B1220;
+html,
+body {
+  background: var(--bg-base);
+  color: var(--fg-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.num,
+[data-num] {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }

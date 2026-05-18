@@ -36,8 +36,8 @@ export function Step5Confirm({ onEdit }: Props) {
   return (
     <div className="space-y-5">
       <header>
-        <h2 className="text-xl font-semibold text-zinc-900">Repasá y confirmá</h2>
-        <p className="text-sm text-zinc-600 mt-1">Si algo está mal, tocá el lápiz para volver.</p>
+        <h2 className="text-xl font-semibold text-fg-primary">Repasá y confirmá</h2>
+        <p className="text-sm text-fg-secondary mt-1">Si algo está mal, tocá el lápiz para volver.</p>
       </header>
 
       {/* Datos personales */}
@@ -74,16 +74,16 @@ export function Step5Confirm({ onEdit }: Props) {
         <Row label="Comprobante ingresos">{v.doc_income_proof ? '✓ Cargado' : '✗ Falta'}</Row>
       </SummaryCard>
 
-      <fieldset className="rounded-xl border border-zinc-200 p-4 space-y-3">
-        <legend className="px-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Términos</legend>
-        <label className="flex items-start gap-3 text-sm text-zinc-700">
+      <fieldset className="rounded border border-border-color p-4 space-y-3">
+        <legend className="px-2 text-xs font-semibold text-fg-muted uppercase tracking-wider">Términos</legend>
+        <label className="flex items-start gap-3 text-sm text-fg-primary">
           <input type="checkbox" className="mt-1 h-4 w-4 accent-lga-primary" {...register('terms_accepted')} />
           <span>
             Acepto los <a className="underline text-lga-primary" href="/terminos" target="_blank" rel="noreferrer">términos y condiciones</a> y autorizo a LGA a contactarme para evaluar mi solicitud.
           </span>
         </label>
         <FieldError message={errors.terms_accepted?.message as string | undefined} />
-        <label className="flex items-start gap-3 text-sm text-zinc-700">
+        <label className="flex items-start gap-3 text-sm text-fg-primary">
           <input type="checkbox" className="mt-1 h-4 w-4 accent-lga-primary" {...register('marketing_consent')} />
           <span>Quiero recibir promociones y ofertas (opcional).</span>
         </label>
@@ -94,9 +94,9 @@ export function Step5Confirm({ onEdit }: Props) {
 
 function SummaryCard({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-zinc-200 p-4">
+    <div className="rounded border border-border-color p-4">
       <header className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-fg-primary">{title}</h3>
         <button type="button" onClick={onEdit} className="text-xs text-lga-primary hover:underline flex items-center gap-1">
           ✎ Editar
         </button>
@@ -109,8 +109,8 @@ function SummaryCard({ title, onEdit, children }: { title: string; onEdit: () =>
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col sm:flex-row sm:gap-3">
-      <dt className="text-zinc-500 sm:w-44 flex-shrink-0">{label}</dt>
-      <dd className="text-zinc-900 break-words">{children}</dd>
+      <dt className="text-fg-muted sm:w-44 flex-shrink-0">{label}</dt>
+      <dd className="text-fg-primary break-words">{children}</dd>
     </div>
   );
 }

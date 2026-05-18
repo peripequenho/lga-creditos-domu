@@ -7,8 +7,8 @@ import { INSTALLMENTS_BY_FREQUENCY, PAYMENT_FREQUENCY_OPTIONS, FREQUENCY_NOUN, c
 import { FieldError } from '../FieldError';
 import { Simulator } from '../Simulator';
 
-const input = 'w-full rounded-md border border-zinc-300 px-3 py-2.5 text-zinc-900 shadow-sm focus:border-lga-primary focus:ring-1 focus:ring-lga-primary outline-none text-base';
-const label = 'block text-sm font-medium text-zinc-700 mb-1';
+const input = 'w-full rounded-md border border-border-color px-3 py-2.5 text-fg-primary focus:border-lga-primary focus:ring-1 focus:ring-lga-primary outline-none text-base';
+const label = 'block text-sm font-medium text-fg-primary mb-1';
 
 export function Step3Credit({ cartTotal }: { cartTotal: number }) {
   const { register, formState: { errors }, setValue, watch } = useFormContext<ApplicationInput>();
@@ -41,18 +41,18 @@ export function Step3Credit({ cartTotal }: { cartTotal: number }) {
   return (
     <div className="space-y-6">
       <header>
-        <h2 className="text-xl font-semibold text-zinc-900">Tu crédito</h2>
-        <p className="text-sm text-zinc-600 mt-1">Decidí cómo querés pagar. Podés simular la cuota ahora.</p>
+        <h2 className="text-xl font-semibold text-fg-primary">Tu crédito</h2>
+        <p className="text-sm text-fg-secondary mt-1">Decidí cómo querés pagar. Podés simular la cuota ahora.</p>
       </header>
 
       {/* Monto */}
-      <div className="rounded-xl border border-zinc-200 p-4 space-y-3">
+      <div className="rounded border border-border-color p-4 space-y-3">
         <div className="flex items-baseline justify-between">
           <label className={label + ' mb-0'}>Monto a financiar</label>
-          <span className="text-xs text-zinc-500">Máximo: {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(cartTotal)}</span>
+          <span className="text-xs text-fg-muted">Máximo: {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(cartTotal)}</span>
         </div>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-medium">$</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted font-medium">$</span>
           <input
             className={input + ' pl-7 text-2xl font-semibold'}
             inputMode="numeric"
@@ -74,7 +74,7 @@ export function Step3Credit({ cartTotal }: { cartTotal: number }) {
           onChange={(e) => setValue('requested_amount_ars', parseInt(e.target.value, 10), { shouldValidate: true })}
           className="w-full accent-lga-primary"
         />
-        <div className="flex justify-between text-[10px] text-zinc-400">
+        <div className="flex justify-between text-[10px] text-fg-muted">
           <span>$1.000</span>
           <span>{new Intl.NumberFormat('es-AR').format(cartTotal)}</span>
         </div>
@@ -87,10 +87,10 @@ export function Step3Credit({ cartTotal }: { cartTotal: number }) {
           {PAYMENT_FREQUENCY_OPTIONS.map((o) => (
             <label
               key={o.value}
-              className={`relative cursor-pointer rounded-xl border-2 p-3 transition-all ${
+              className={`relative cursor-pointer rounded border-2 p-3 transition-all ${
                 freq === o.value
-                  ? 'border-lga-primary bg-emerald-50'
-                  : 'border-zinc-200 hover:border-zinc-300'
+                  ? 'border-lga-primary bg-surface'
+                  : 'border-border-color hover:border-border-color'
               }`}
             >
               <input
@@ -99,8 +99,8 @@ export function Step3Credit({ cartTotal }: { cartTotal: number }) {
                 {...register('payment_frequency')}
                 className="sr-only"
               />
-              <div className="text-sm font-semibold text-zinc-900">{o.label}</div>
-              <div className="text-xs text-zinc-500 mt-0.5">{o.description}</div>
+              <div className="text-sm font-semibold text-fg-primary">{o.label}</div>
+              <div className="text-xs text-fg-muted mt-0.5">{o.description}</div>
               {freq === o.value && (
                 <div className="absolute top-2 right-2 text-lga-primary">✓</div>
               )}
@@ -121,8 +121,8 @@ export function Step3Credit({ cartTotal }: { cartTotal: number }) {
               onClick={() => setValue('requested_installments', n, { shouldValidate: true })}
               className={`py-2 px-2 rounded-md border-2 font-semibold text-sm transition-colors ${
                 installments === n
-                  ? 'border-lga-primary bg-lga-primary text-white'
-                  : 'border-zinc-200 text-zinc-700 hover:border-zinc-300'
+                  ? 'border-lga-primary bg-lga-primary text-bg-base'
+                  : 'border-border-color text-fg-primary hover:border-border-color'
               }`}
             >
               {n}

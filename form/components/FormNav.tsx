@@ -12,13 +12,13 @@ export function FormNav({
   onPrev, onNext, nextLabel, nextDisabled, prevDisabled, loading, isLastStep,
 }: Props) {
   return (
-    <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-white/95 backdrop-blur border-t border-zinc-200 flex gap-3 items-center">
+    <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-surface/95 border-t border-border-color flex gap-3 items-center">
       <div className="max-w-3xl mx-auto w-full flex gap-3">
         <button
           type="button"
           onClick={onPrev}
           disabled={prevDisabled || loading}
-          className="px-4 py-2.5 rounded-md border border-zinc-300 text-zinc-700 font-medium hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-4 py-2.5 rounded-md border border-border-color text-fg-primary font-medium hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed"
         >
           ← Atrás
         </button>
@@ -26,9 +26,9 @@ export function FormNav({
           type="button"
           onClick={onNext}
           disabled={nextDisabled || loading}
-          className={`flex-1 py-2.5 rounded-md font-semibold text-white transition-colors ${
+          className={`flex-1 py-2.5 rounded-md font-semibold text-bg-base transition-colors ${
             isLastStep
-              ? 'bg-emerald-600 hover:bg-emerald-700'
+              ? 'bg-state-ok hover:opacity-90'
               : 'bg-lga-primary hover:bg-lga-primaryHover'
           } disabled:opacity-60 disabled:cursor-not-allowed`}
         >

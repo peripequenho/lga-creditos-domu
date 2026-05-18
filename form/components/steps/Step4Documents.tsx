@@ -14,8 +14,8 @@ export function Step4Documents({ applicationCode }: { applicationCode: string })
   return (
     <div className="space-y-5">
       <header>
-        <h2 className="text-xl font-semibold text-zinc-900">Documentación</h2>
-        <p className="text-sm text-zinc-600 mt-1">
+        <h2 className="text-xl font-semibold text-fg-primary">Documentación</h2>
+        <p className="text-sm text-fg-secondary mt-1">
           Tomá fotos claras o subí PDFs. Tus documentos se guardan privados — solo el equipo de LGA accede.
         </p>
       </header>
@@ -62,8 +62,8 @@ export function Step4Documents({ applicationCode }: { applicationCode: string })
         onUploaded={(path) => setValue('doc_income_proof', path, { shouldValidate: true })}
       />
 
-      <div className="rounded-xl bg-zinc-50 border border-zinc-200 p-3">
-        <p className="text-xs text-zinc-600 leading-relaxed">
+      <div className="rounded bg-surface border border-border-color p-3">
+        <p className="text-xs text-fg-secondary leading-relaxed">
           <strong>Privacidad:</strong> tus documentos se almacenan en Supabase Storage en un bucket privado.
           Solo personal autorizado de LGA puede acceder con credenciales internas.
           No los compartimos con terceros.

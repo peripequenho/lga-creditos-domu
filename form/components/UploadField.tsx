@@ -55,16 +55,16 @@ export function UploadField({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-zinc-700">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="block text-sm font-medium text-fg-primary">
+        {label} {required && <span className="text-state-risk">*</span>}
       </label>
-      {hint && <p className="text-xs text-zinc-500 -mt-1">{hint}</p>}
+      {hint && <p className="text-xs text-fg-muted -mt-1">{hint}</p>}
 
       <div
-        className={`relative rounded-xl border-2 border-dashed transition-colors ${
-          done ? 'border-emerald-300 bg-emerald-50/40' :
-          error ? 'border-red-300 bg-red-50/40' :
-          'border-zinc-300 hover:border-lga-primary hover:bg-emerald-50/30'
+        className={`relative rounded border-2 border-dashed transition-colors ${
+          done ? 'border-border-color bg-surface/40' :
+          error ? 'border-state-risk/60 bg-surface/40' :
+          'border-border-color hover:border-lga-primary hover:bg-surface/30'
         } p-4 text-center cursor-pointer`}
         onClick={() => !uploading && inputRef.current?.click()}
       >
@@ -80,27 +80,27 @@ export function UploadField({
         />
         {uploading ? (
           <div className="space-y-2">
-            <p className="text-sm text-zinc-700 font-medium">Subiendo…</p>
-            <div className="h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+            <p className="text-sm text-fg-primary font-medium">Subiendo…</p>
+            <div className="h-1.5 bg-surface-raised rounded-full overflow-hidden">
               <div className="h-full bg-lga-primary transition-all" style={{ width: `${progress}%` }} />
             </div>
           </div>
         ) : done ? (
-          <div className="flex items-center justify-center gap-2 text-emerald-700">
+          <div className="flex items-center justify-center gap-2 text-state-ok">
             <span className="text-xl">✓</span>
             <span className="text-sm font-medium">Archivo cargado</span>
-            <span className="text-xs text-emerald-600">· Tocá para cambiar</span>
+            <span className="text-xs text-state-ok">· Tocá para cambiar</span>
           </div>
         ) : (
           <div className="space-y-1">
             <p className="text-2xl">📎</p>
-            <p className="text-sm text-zinc-700 font-medium">Tocá para subir</p>
-            <p className="text-xs text-zinc-500">JPG, PNG o PDF · hasta 10MB</p>
+            <p className="text-sm text-fg-primary font-medium">Tocá para subir</p>
+            <p className="text-xs text-fg-muted">JPG, PNG o PDF · hasta 10MB</p>
           </div>
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
+      {error && <p className="text-sm text-state-risk mt-1">{error}</p>}
     </div>
   );
 }

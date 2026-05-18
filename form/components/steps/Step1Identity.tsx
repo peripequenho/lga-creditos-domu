@@ -4,8 +4,8 @@ import { useFormContext } from 'react-hook-form';
 import type { ApplicationInput } from '@/lib/schema';
 import { FieldError } from '../FieldError';
 
-const input = 'w-full rounded-md border border-zinc-300 px-3 py-2.5 text-zinc-900 shadow-sm focus:border-lga-primary focus:ring-1 focus:ring-lga-primary outline-none text-base';
-const label = 'block text-sm font-medium text-zinc-700 mb-1';
+const input = 'w-full rounded-md border border-border-color px-3 py-2.5 text-fg-primary focus:border-lga-primary focus:ring-1 focus:ring-lga-primary outline-none text-base';
+const label = 'block text-sm font-medium text-fg-primary mb-1';
 
 export function Step1Identity() {
   const { register, formState: { errors }, watch } = useFormContext<ApplicationInput>();
@@ -17,8 +17,8 @@ export function Step1Identity() {
   return (
     <div className="space-y-5">
       <header>
-        <h2 className="text-xl font-semibold text-zinc-900">Tus datos</h2>
-        <p className="text-sm text-zinc-600 mt-1">Solo lo necesario para identificarte. Tarda menos de un minuto.</p>
+        <h2 className="text-xl font-semibold text-fg-primary">Tus datos</h2>
+        <p className="text-sm text-fg-secondary mt-1">Solo lo necesario para identificarte. Tarda menos de un minuto.</p>
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -49,7 +49,7 @@ export function Step1Identity() {
         <div>
           <label className={label}>
             Fecha de nacimiento {age != null && (
-              <span className="text-zinc-500 font-normal">· {age} años</span>
+              <span className="text-fg-muted font-normal">· {age} años</span>
             )}
           </label>
           <input className={input} type="date" autoComplete="bday" {...register('birth_date')} />
@@ -69,11 +69,11 @@ export function Step1Identity() {
             {...register('phone')}
           />
           <FieldError message={errors.phone?.message} />
-          <p className="text-xs text-zinc-500 mt-1">Por acá te contactamos.</p>
+          <p className="text-xs text-fg-muted mt-1">Por acá te contactamos.</p>
         </div>
         <div>
           <label className={label}>
-            Email <span className="text-zinc-400 font-normal">(opcional)</span>
+            Email <span className="text-fg-muted font-normal">(opcional)</span>
           </label>
           <input className={input} type="email" autoComplete="email" placeholder="juan@email.com" {...register('email')} />
           <FieldError message={errors.email?.message} />

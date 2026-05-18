@@ -19,16 +19,16 @@ function fmtMoney(v: number | undefined) {
 export function StickyProduct({ title, unitPriceArs, quantity, cartTotalArs, cartSummary, source }: Props) {
   const multi = source === 'cart_multi';
   return (
-    <aside className="rounded-xl border border-zinc-200 bg-gradient-to-br from-emerald-50 to-white p-3.5 flex items-center gap-3 shadow-sm">
-      <div className="h-12 w-12 rounded-lg bg-emerald-100 flex items-center justify-center text-2xl flex-shrink-0">
+    <aside className="rounded border border-border-color bg-gradient-to-br from-surface to-surface-raised p-3.5 flex items-center gap-3">
+      <div className="h-12 w-12 rounded-lg bg-surface-raised flex items-center justify-center text-2xl flex-shrink-0">
         📦
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Tu compra</p>
-        <p className="text-sm font-medium text-zinc-900 truncate">
+        <p className="text-[10px] uppercase tracking-wider text-fg-muted font-semibold">Tu compra</p>
+        <p className="text-sm font-medium text-fg-primary truncate">
           {multi && cartSummary ? cartSummary : title || 'Producto'}
         </p>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-fg-muted">
           {quantity && quantity > 1 && !multi ? `${quantity} unidades · ` : ''}
           Total <span className="font-semibold text-lga-primary">{fmtMoney(cartTotalArs)}</span>
         </p>
