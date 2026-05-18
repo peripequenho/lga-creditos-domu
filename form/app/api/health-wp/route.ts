@@ -24,11 +24,28 @@ export async function GET() {
     }
   }
 
+  // Listo todas las keys de env vars que ve el runtime (sin valores)
+  const allEnvKeys = Object.keys(process.env).sort();
+  const projectEnvKeys = allEnvKeys.filter(k =>
+    k.startsWith('WP_') ||
+    k.startsWith('N8N_') ||
+    k.startsWith('DATABASE_') ||
+    k.startsWith('SUPABASE_') ||
+    k.startsWith('SUPABASE_') ||
+    k.startsWith('NEXT_PUBLIC_') ||
+    k === 'VERCEL_ENV' ||
+    k === 'VERCEL_URL'
+  );
+
   return NextResponse.json({
     hasUrl: !!WP_URL,
     urlPreview: WP_URL ? WP_URL.replace(/(.{40}).*/, '$1...') : null,
     hasAuth: !!WP_AUTH,
     authLength: WP_AUTH ? WP_AUTH.length : 0,
     wpReachable,
+    debug_projectEnvKeys: projectEnvKeys,
+    debug_totalEnvKeys: allEnvKeys.length,
+    debug_vercelEnv: process.env.VERCEL_ENV ?? null,
+    debug_buildTime: process.env.VERCEL_DEPLOYMENT_ID ?? null,
   });
 }
