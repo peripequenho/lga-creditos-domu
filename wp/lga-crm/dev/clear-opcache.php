@@ -112,14 +112,22 @@ foreach ( array( 'cobrador-1', 'cobrador-2' ) as $login ) {
     }
 }
 
-echo "\n=== DEBUG LEADS (problema counter Leads) ===\n";
+echo "\n=== DEBUG + BACKFILL LEADS ===\n";
 $all_leads = get_posts( array( 'post_type' => 'lead', 'posts_per_page' => -1, 'post_status' => array('publish','draft') ) );
-echo "TOTAL leads en DB (admin pure get_posts): " . count( $all_leads ) . "\n";
+echo "TOTAL leads en DB: " . count( $all_leads ) . "\n";
+$fixed = 0;
 foreach ( $all_leads as $l ) {
     $status = get_post_meta( $l->ID, 'lead_status', true );
     $resp = get_post_meta( $l->ID, 'responsable', true );
-    echo "  #" . $l->ID . " '" . $l->post_title . "' status='" . $status . "' resp='" . $resp . "' post_status='" . $l->post_status . "'\n";
+    $needs_fix = ( $status === '' || $status === null );
+    if ( $needs_fix ) {
+        update_post_meta( $l->ID, 'lead_status', 'nuevo' );
+        $status = 'nuevo (BACKFILL)';
+        $fixed++;
+    }
+    echo "  #" . $l->ID . " '" . $l->post_title . "' status='" . $status . "' resp='" . $resp . "'\n";
 }
+echo "BACKFILL: $fixed leads recibieron status='nuevo'\n";
 
 echo "\n--- via lga_crm_get_leads_for_user (admin) ---\n";
 $gero = get_user_by( 'login', 'gerolopezge@gmail.com' );

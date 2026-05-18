@@ -1,5 +1,19 @@
 <?php
 /**
+ * Backfill: cuando se inserta un lead sin lead_status (caso REST API),
+ * setearle 'nuevo' como default para que aparezca en el listado del
+ * vendedor. Se engancha a save_post_lead con priority alta.
+ */
+add_action( 'save_post_lead', function ( $post_id, $post, $update ) {
+    if ( $update ) return;
+    if ( wp_is_post_revision( $post_id ) ) return;
+    $current = get_post_meta( $post_id, 'lead_status', true );
+    if ( $current === '' || $current === null ) {
+        update_post_meta( $post_id, 'lead_status', 'nuevo' );
+    }
+}, 10, 3 );
+
+/**
  * Query helpers + filtros automáticos por rol.
  *
  * pre_get_posts: en queries del frontend de los CPTs lead/cliente/credito,
@@ -83,11 +97,13 @@ function lga_crm_get_leads_for_user( $user_id = null, $args = array() ) {
     }
 
     if ( ! $include_closed ) {
-        // Excluir leads terminales (aprobado / rechazado / perdido)
+        // Solo leads en estados activos. Si el lead no tiene meta lead_status
+        // (caso de items creados directamente via REST API sin pasar por ACF),
+        // se inicializan a 'nuevo' por defecto vía el filter más abajo.
         $meta_filters[] = array(
-            'relation' => 'OR',
-            array( 'key' => 'lead_status', 'compare' => 'NOT EXISTS' ),
-            array( 'key' => 'lead_status', 'value' => array( 'nuevo', 'en_visita' ), 'compare' => 'IN' ),
+            'key' => 'lead_status',
+            'value' => array( 'nuevo', 'en_visita' ),
+            'compare' => 'IN',
         );
     }
 
