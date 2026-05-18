@@ -12,9 +12,9 @@ $tab = sanitize_key( $_GET['tab'] ?? 'leads' );
 $valid_tabs = array( 'solicitudes', 'leads', 'clientes', 'creditos' );
 if ( ! in_array( $tab, $valid_tabs, true ) ) $tab = 'leads';
 
-// Counts para badges en tabs
+// Counts para badges en tabs (alineados con lo que muestra cada tab)
 $count_sol = count( lga_crm_get_pending_solicitudes() );
-$count_leads = lga_crm_count( 'lead' );
+$count_leads = count( lga_crm_get_leads_for_user() );       // solo activos
 $count_clientes = lga_crm_count( 'cliente' );
 $count_creditos = lga_crm_count( 'credito' );
 
