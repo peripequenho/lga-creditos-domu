@@ -62,6 +62,7 @@ foreach ( $sections as $st => $cfg ):
             <table class="lga-table">
                 <thead>
                     <tr>
+                        <th>Origen</th>
                         <th>Cliente</th>
                         <th>DNI / Tel</th>
                         <th>Domicilio</th>
@@ -78,8 +79,16 @@ foreach ( $sections as $st => $cfg ):
                     $addr  = get_field( 'address_line', $p->ID );
                     $loc   = get_field( 'locality', $p->ID );
                     $monto = get_field( 'requested_amount_ars', $p->ID );
+                    $origen = get_field( 'origen', $p->ID ) ?: 'web';
                 ?>
                     <tr>
+                        <td>
+                            <?php if ( $origen === 'web' ): ?>
+                                <span class="lga-badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">Shopify</span>
+                            <?php else: ?>
+                                <span class="lga-badge bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10">Manual</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <a class="lga-link font-medium" href="<?php echo esc_url( home_url( '/lead/' . $p->ID ) ); ?>"><?php echo esc_html( $last . ', ' . $first ); ?></a>
                         </td>

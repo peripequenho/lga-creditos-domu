@@ -191,9 +191,38 @@ function lga_crm_handle_update_lead_status() {
         exit;
     }
 
-    // Rechazado / perdido / en_visita / nuevo → volver al listado del rol (no a la ficha)
+    // Rechazado / perdido → cancelar en Shopify (draft delete o order cancel según estado)
     $role = lga_crm_current_role();
     if ( in_array( $new_status, array( 'rechazado', 'perdido' ), true ) ) {
+        if ( function_exists( 'lga_crm_shopify_enabled' ) && lga_crm_shopify_enabled() ) {
+            $has_order = get_post_meta( $lead_id, 'shopify_order_id', true );
+            $has_draft = get_post_meta( $lead_id, 'shopify_draft_order_id', true );
+
+            if ( $has_order ) {
+                // Lead ya tenía order → cancelar
+                lga_crm_shopify_cancel_order( $lead_id, 'DECLINED' );
+                // Propagar el cancelled status al cliente + crédito si existen
+                $cliente_id = (int) get_field( 'cliente_ref', $lead_id );
+                $credito_id = (int) get_field( 'credito_ref', $lead_id );
+                if ( $cliente_id ) {
+                    update_post_meta( $cliente_id, 'shopify_status', 'order_cancelled' );
+                    update_post_meta( $cliente_id, 'shopify_order_fulfillment_status', 'cancelled' );
+                }
+                if ( $credito_id ) {
+                    update_post_meta( $credito_id, 'shopify_status', 'order_cancelled' );
+                    update_post_meta( $credito_id, 'shopify_order_fulfillment_status', 'cancelled' );
+                    update_field( 'credit_status', 'cancelado', $credito_id );
+                }
+            } elseif ( $has_draft ) {
+                // Lead solo tenía draft → borrar el draft (no había order)
+                lga_crm_shopify_delete_draft( $lead_id );
+                // También en la solicitud original si existe
+                $sol_id = (int) get_field( 'solicitud_ref', $lead_id );
+                if ( $sol_id ) {
+                    update_post_meta( $sol_id, 'shopify_status', 'draft_deleted' );
+                }
+            }
+        }
         // Estados terminales: vuelve al listado
         $target = ( $role === 'vendedor' ) ? '/panel/vendedor/' : '/panel/admin/?tab=leads';
         wp_safe_redirect( home_url( $target . ( strpos( $target, '?' ) === false ? '?' : '&' ) . 'msg=updated' ) );
@@ -286,6 +315,16 @@ function lga_crm_promote_lead_to_client_credit( $lead_id, $args = array() ) {
     update_field( 'cliente_ref', $cliente_id, $lead_id );
     update_field( 'credito_ref', $credito_id, $lead_id );
 
+    // 5) SHOPIFY: completar draft → order "no preparado" (unfulfilled).
+    // Propagar el meta a cliente + crédito para trazabilidad y deep-link.
+    if ( function_exists( 'lga_crm_shopify_complete_draft' ) && lga_crm_shopify_enabled() ) {
+        $complete_result = lga_crm_shopify_complete_draft( $lead_id, array( $cliente_id, $credito_id ) );
+        if ( is_wp_error( $complete_result ) ) {
+            // No fail: el lead/cliente/crédito se crearon OK. Log el error en meta.
+            update_post_meta( $lead_id, 'shopify_last_error', $complete_result->get_error_message() );
+        }
+    }
+
     return array( 'cliente_id' => $cliente_id, 'credito_id' => $credito_id );
 }
 
@@ -351,6 +390,19 @@ function lga_crm_handle_convert_solicitud() {
     // CLAVE: marcar la solicitud como 'in_review' para que se OCULTE del tab pendientes
     update_field( 'application_status', 'in_review', $sol_id );
     update_field( 'lead_ref', $lead_id, $sol_id );
+
+    // SHOPIFY: copiar meta de la solicitud al lead (NO completar draft todavía,
+    // el draft pasa a Order solo cuando el lead se aprueba a cliente+crédito).
+    $shopify_keys = array(
+        'shopify_draft_order_id', 'shopify_draft_order_gid', 'shopify_draft_order_name',
+        'shopify_invoice_url', 'shopify_status', 'shopify_last_sync_at',
+    );
+    foreach ( $shopify_keys as $k ) {
+        $v = get_post_meta( $sol_id, $k, true );
+        if ( $v !== '' && $v !== null ) {
+            update_post_meta( $lead_id, $k, $v );
+        }
+    }
 
     // Redirect al LISTADO de leads (no a la ficha) → browser back NO vuelve al modal
     wp_safe_redirect( home_url( '/panel/admin/?tab=leads&new=' . $lead_id . '&msg=converted' ) );

@@ -117,7 +117,19 @@ lga_crm_flash();
     </div>
 
     <aside class="space-y-4 text-sm">
-        <div class="bg-white rounded-lg border border-zinc-200 p-5">
+        <div class="lga-card p-5">
+            <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Origen</h3>
+            <?php $origen = $f('origen') ?: ''; ?>
+            <?php if ( $origen === 'web' ): ?>
+                <span class="lga-badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">Shopify (Domu)</span>
+            <?php elseif ( $origen === 'manual' ): ?>
+                <span class="lga-badge bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10">Manual (admin)</span>
+            <?php else: ?>
+                <span class="text-zinc-400 text-xs">— sin definir —</span>
+            <?php endif; ?>
+        </div>
+
+        <div class="lga-card p-5">
             <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Asignación</h3>
             <?php $cob_id = (int) $f('cobrador'); $cob_user = $cob_id ? get_userdata( $cob_id ) : null; ?>
             <p><span class="text-zinc-500">Cobrador:</span> <?php echo $cob_user ? esc_html( $cob_user->display_name ) : '<span class="text-zinc-400">Sin asignar</span>'; ?></p>
@@ -126,6 +138,8 @@ lga_crm_flash();
             <a href="<?php echo esc_url( get_edit_post_link( $cli_id ) ); ?>" class="mt-3 inline-block text-emerald-700 hover:underline text-xs">Editar en wp-admin →</a>
             <?php endif; ?>
         </div>
+
+        <?php $shopify_post_id = $cli_id; include LGA_CRM_DIR . 'templates/_shopify-card.php'; ?>
     </aside>
 </div>
 

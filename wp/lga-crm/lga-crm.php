@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'LGA_CRM_VERSION', '0.2.2' );
+define( 'LGA_CRM_VERSION', '0.3.0' );
 define( 'LGA_CRM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LGA_CRM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -30,6 +30,7 @@ function lga_crm_bootstrap() {
     require_once LGA_CRM_DIR . 'inc/login.php';
     require_once LGA_CRM_DIR . 'inc/queries.php';
     require_once LGA_CRM_DIR . 'inc/handlers.php';
+    require_once LGA_CRM_DIR . 'inc/shopify.php';
 
     // Hook order: roles primero, después CPTs (caps dependen de roles existir)
     add_action( 'init', 'lga_crm_register_roles', 5 );

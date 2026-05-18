@@ -104,12 +104,22 @@ lga_crm_flash();
         </div>
         <?php endif; ?>
 
-        <div class="bg-white rounded-lg border border-zinc-200 p-5 text-xs">
-            <h3 class="text-sm font-semibold mb-2">Origen</h3>
+        <div class="lga-card p-5 text-xs">
+            <h3 class="text-sm font-semibold mb-3">Origen</h3>
+            <?php $origen = $f('origen') ?: 'web'; ?>
+            <div class="mb-3">
+                <?php if ( $origen === 'web' ): ?>
+                    <span class="lga-badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">Shopify (Domu)</span>
+                <?php else: ?>
+                    <span class="lga-badge bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10">Manual (admin)</span>
+                <?php endif; ?>
+            </div>
             <dl class="space-y-1">
-                <div><dt class="text-zinc-500">Tipo</dt><dd><?php echo esc_html( lga_crm_label( 'origen', $f('origen') ) ); ?></dd></div>
                 <?php $sol = $f('solicitud_ref'); if ( $sol ): ?>
-                <div><dt class="text-zinc-500">Solicitud</dt><dd><a class="lga-link font-mono text-xs" href="<?php echo esc_url( get_edit_post_link( $sol ) ?: '#' ); ?>"><?php echo esc_html( get_the_title( $sol ) ); ?></a></dd></div>
+                <div><dt class="text-zinc-500">Solicitud</dt><dd><a class="lga-link font-mono text-xs" href="<?php echo esc_url( home_url( '/wp-admin/post.php?post=' . $sol . '&action=edit' ) ); ?>"><?php echo esc_html( get_the_title( $sol ) ); ?></a></dd></div>
+                <?php endif; ?>
+                <?php if ( $f('product_title') ): ?>
+                <div><dt class="text-zinc-500">Producto</dt><dd class="text-xs"><?php echo esc_html( $f('product_title') ); ?></dd></div>
                 <?php endif; ?>
                 <?php if ( $f('utm_source') ): ?>
                 <div><dt class="text-zinc-500">UTM</dt><dd><?php echo esc_html( $f('utm_source') . ' · ' . $f('utm_campaign') ); ?></dd></div>
@@ -119,6 +129,8 @@ lga_crm_flash();
                 <?php endif; ?>
             </dl>
         </div>
+
+        <?php $shopify_post_id = $lead_id; include LGA_CRM_DIR . 'templates/_shopify-card.php'; ?>
     </aside>
 </div>
 

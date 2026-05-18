@@ -89,8 +89,10 @@ lga_crm_flash();
         </div>
         <?php endif; ?>
 
+        <?php $shopify_post_id = $cr_id; include LGA_CRM_DIR . 'templates/_shopify-card.php'; ?>
+
         <?php if ( current_user_can( 'edit_others_creditos' ) ): ?>
-        <div class="bg-white rounded-lg border border-zinc-200 p-5">
+        <div class="lga-card p-5">
             <a href="<?php echo esc_url( get_edit_post_link( $cr_id ) ); ?>" class="lga-link text-xs">Editar en wp-admin →</a>
         </div>
         <?php endif; ?>

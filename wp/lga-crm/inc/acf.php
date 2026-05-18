@@ -218,4 +218,47 @@ function lga_crm_register_acf_fields() {
             array( 'key' => 'ld_zona', 'label' => 'Zona', 'name' => 'zona', 'type' => 'text', 'show_in_rest' => 1 ),
         ),
     ) );
+
+    // ──────────────────────────────────────────────────────────────────
+    // SHOPIFY (compartido entre solicitud, lead, cliente, credito)
+    // ──────────────────────────────────────────────────────────────────
+    acf_add_local_field_group( array(
+        'key'      => 'group_lga_shopify',
+        'title'    => 'Shopify (draft / order / sync)',
+        'location' => array(
+            array( array( 'param' => 'post_type', 'operator' => '==', 'value' => 'solicitud' ) ),
+            array( array( 'param' => 'post_type', 'operator' => '==', 'value' => 'lead'      ) ),
+            array( array( 'param' => 'post_type', 'operator' => '==', 'value' => 'cliente'   ) ),
+            array( array( 'param' => 'post_type', 'operator' => '==', 'value' => 'credito'   ) ),
+        ),
+        'menu_order' => 50,
+        'position'   => 'side',
+        'style'      => 'default',
+        'label_placement'       => 'top',
+        'instruction_placement' => 'label',
+        'active'        => true,
+        'show_in_rest'  => 1,
+        'fields'   => array(
+            array(
+                'key' => 'sh_status', 'label' => 'Estado Shopify', 'name' => 'shopify_status', 'type' => 'select',
+                'choices' => array(
+                    ''                  => '— Sin Shopify —',
+                    'draft_created'     => 'Borrador creado',
+                    'draft_deleted'     => 'Borrador eliminado',
+                    'order_unfulfilled' => 'Pedido — No preparado',
+                    'order_cancelled'   => 'Pedido cancelado',
+                    'error'             => 'Error',
+                ),
+                'allow_null' => 1, 'show_in_rest' => 1, 'wrapper' => array( 'class' => 'lga-readonly' ),
+            ),
+            array( 'key' => 'sh_draft_id',   'label' => 'Draft Order ID',   'name' => 'shopify_draft_order_id',   'type' => 'text', 'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_draft_name', 'label' => 'Draft Order Nº',   'name' => 'shopify_draft_order_name', 'type' => 'text', 'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_order_id',   'label' => 'Order ID',         'name' => 'shopify_order_id',         'type' => 'text', 'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_order_name', 'label' => 'Order Nº',         'name' => 'shopify_order_name',       'type' => 'text', 'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_fulfill',    'label' => 'Fulfillment',      'name' => 'shopify_order_fulfillment_status', 'type' => 'text', 'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_invoice',    'label' => 'Invoice URL',      'name' => 'shopify_invoice_url',      'type' => 'url',  'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_synced',     'label' => 'Última sync',      'name' => 'shopify_last_sync_at',     'type' => 'text', 'readonly' => 1, 'show_in_rest' => 1 ),
+            array( 'key' => 'sh_last_err',   'label' => 'Último error',     'name' => 'shopify_last_error',       'type' => 'textarea', 'rows' => 2, 'readonly' => 1, 'show_in_rest' => 1 ),
+        ),
+    ) );
 }
