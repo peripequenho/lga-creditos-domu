@@ -90,4 +90,26 @@ foreach ( array( 'cobrador-1', 'cobrador-2' ) as $login ) {
     }
 }
 
+echo "\n=== TEST: lga_crm_get_creditos_for_user() exactamente ===\n";
+foreach ( array( 'cobrador-1', 'cobrador-2' ) as $login ) {
+    $u = get_user_by( 'login', $login );
+    if ( ! $u ) continue;
+    echo "$login (ID $u->ID):\n";
+
+    if ( function_exists( 'lga_crm_get_creditos_for_user' ) ) {
+        $creds = lga_crm_get_creditos_for_user( $u->ID );
+        echo "  lga_crm_get_creditos_for_user(" . $u->ID . ") returned: " . count( $creds ) . " items\n";
+        foreach ( $creds as $c ) {
+            echo "    #" . $c->ID . " " . $c->post_title . "\n";
+        }
+    } else {
+        echo "  función NO existe\n";
+    }
+
+    if ( function_exists( 'lga_crm_get_clientes_for_user' ) ) {
+        $clis = lga_crm_get_clientes_for_user( $u->ID, array( 'fields' => 'ids' ) );
+        echo "  lga_crm_get_clientes_for_user(ids) returned: " . var_export( $clis, true ) . "\n";
+    }
+}
+
 echo "\n=== FIN DEBUG ===\n";
