@@ -1,0 +1,5 @@
+/* Estilos extra LGA CRM (sobre Tailwind CDN) */
+body { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+.lga-link { color: #0F766E; }
+.lga-link:hover { text-decoration: underline; }
+pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; }
