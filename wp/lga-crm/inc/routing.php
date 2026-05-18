@@ -55,19 +55,21 @@ function lga_crm_router() {
     $id = (int) get_query_var( 'lga_id' );
     $role = lga_crm_current_role();
 
-    // Routing tabla
+    // Routing tabla — se chequea por ROL (no por cap individual) para evitar
+    // problemas de map_meta_cap con CPTs que tienen capability_type custom.
+    // Caps granulares se verifican adentro de los templates si hace falta.
     $map = array(
-        'panel'              => array( 'tpl' => 'panel-router.php',     'caps' => array( 'read' ) ),
-        'panel-admin'        => array( 'tpl' => 'panel-admin.php',      'caps' => array( 'manage_options' ) ),
-        'panel-vendedor'     => array( 'tpl' => 'panel-vendedor.php',   'caps' => array( 'read_lead' ) ),
-        'panel-cobrador'     => array( 'tpl' => 'panel-cobrador.php',   'caps' => array( 'read_cliente' ) ),
-        'lead-detail'        => array( 'tpl' => 'lead-detail.php',      'caps' => array( 'read_lead' ) ),
-        'cliente-detail'     => array( 'tpl' => 'cliente-detail.php',   'caps' => array( 'read_cliente' ) ),
-        'credito-detail'     => array( 'tpl' => 'credito-detail.php',   'caps' => array( 'read_credito' ) ),
-        'cliente-nuevo'      => array( 'tpl' => 'cliente-nuevo.php',    'caps' => array( 'lga_create_cliente' ) ),
-        'credito-asignar'    => array( 'tpl' => 'credito-asignar.php',  'caps' => array( 'lga_create_credito' ) ),
-        'aprobar-solicitud'  => array( 'tpl' => 'aprobar-solicitud.php','caps' => array( 'lga_convert_solicitud' ) ),
-        'promover-lead'      => array( 'tpl' => 'promover-lead.php',    'caps' => array( 'lga_approve_lead' ) ),
+        'panel'              => array( 'tpl' => 'panel-router.php',     'roles' => array( 'administrator', 'vendedor', 'cobrador' ) ),
+        'panel-admin'        => array( 'tpl' => 'panel-admin.php',      'roles' => array( 'administrator' ) ),
+        'panel-vendedor'     => array( 'tpl' => 'panel-vendedor.php',   'roles' => array( 'administrator', 'vendedor' ) ),
+        'panel-cobrador'     => array( 'tpl' => 'panel-cobrador.php',   'roles' => array( 'administrator', 'cobrador' ) ),
+        'lead-detail'        => array( 'tpl' => 'lead-detail.php',      'roles' => array( 'administrator', 'vendedor' ) ),
+        'cliente-detail'     => array( 'tpl' => 'cliente-detail.php',   'roles' => array( 'administrator', 'cobrador' ) ),
+        'credito-detail'     => array( 'tpl' => 'credito-detail.php',   'roles' => array( 'administrator', 'cobrador' ) ),
+        'cliente-nuevo'      => array( 'tpl' => 'cliente-nuevo.php',    'roles' => array( 'administrator' ) ),
+        'credito-asignar'    => array( 'tpl' => 'credito-asignar.php',  'roles' => array( 'administrator' ) ),
+        'aprobar-solicitud'  => array( 'tpl' => 'aprobar-solicitud.php','roles' => array( 'administrator' ) ),
+        'promover-lead'      => array( 'tpl' => 'promover-lead.php',    'roles' => array( 'administrator' ) ),
     );
 
     if ( ! isset( $map[ $route ] ) ) {
@@ -76,13 +78,20 @@ function lga_crm_router() {
 
     $entry = $map[ $route ];
 
-    // Permission check (any-of)
-    $can = false;
-    foreach ( $entry['caps'] as $cap ) {
-        if ( current_user_can( $cap ) ) { $can = true; break; }
-    }
+    // Permission check by role (no map_meta_cap interference)
+    $can = in_array( $role, $entry['roles'], true );
     if ( ! $can ) {
-        wp_safe_redirect( home_url( '/panel' ) );
+        // No loop a /panel: si ya estaba intentando entrar a /panel y falló (no debería),
+        // mostrar 403 directo. Si entró a otra ruta, llevarlo a su panel default.
+        if ( $route === 'panel' ) {
+            status_header( 403 );
+            wp_die( 'No tenés un rol asignado o tu rol no permite acceder al panel. Contactá al admin.', 'Acceso denegado', array( 'response' => 403 ) );
+        }
+        // Mandar a su panel correspondiente sin pasar por /panel router (evita loop)
+        $target = '/panel/admin';
+        if ( $role === 'vendedor' ) $target = '/panel/vendedor';
+        elseif ( $role === 'cobrador' ) $target = '/panel/cobrador';
+        wp_safe_redirect( home_url( $target ) );
         exit;
     }
 
