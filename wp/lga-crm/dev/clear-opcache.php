@@ -49,4 +49,42 @@ if ( function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_runtime
 }
 
 echo "\n=== CACHE LIMPIA ===\n";
-echo "Recargá las páginas del panel — el código v" . LGA_CRM_VERSION . " ya está activo.\n";
+echo "Versión plugin: " . LGA_CRM_VERSION . "\n";
+
+// ─── DEBUG: cobrador-1 view ─────────────────────────────────────────────
+echo "\n=== DEBUG: cobrador-1 / cobrador-2 ===\n";
+foreach ( array( 'cobrador-1', 'cobrador-2' ) as $login ) {
+    $u = get_user_by( 'login', $login );
+    if ( ! $u ) { echo "  $login: NO existe\n"; continue; }
+    echo "  $login (ID $u->ID, roles: " . implode( ',', $u->roles ) . ")\n";
+
+    // Clientes asignados
+    $clientes_ids = get_posts( array(
+        'post_type' => 'cliente', 'posts_per_page' => -1, 'fields' => 'ids',
+        'meta_query' => array( array( 'key' => 'cobrador', 'value' => $u->ID, 'compare' => '=' ) ),
+    ) );
+    echo "    clientes IDs: " . implode( ', ', $clientes_ids ) . " (" . count( $clientes_ids ) . ")\n";
+
+    // Créditos vía cliente_ref IN clientes_ids
+    if ( ! empty( $clientes_ids ) ) {
+        $creditos = get_posts( array(
+            'post_type' => 'credito', 'posts_per_page' => -1,
+            'meta_query' => array( array( 'key' => 'cliente_ref', 'value' => $clientes_ids, 'compare' => 'IN' ) ),
+        ) );
+        echo "    créditos via IN: " . count( $creditos ) . "\n";
+        foreach ( $creditos as $cr ) {
+            $ref = get_post_meta( $cr->ID, 'cliente_ref', true );
+            echo "      #" . $cr->ID . " '" . $cr->post_title . "' cliente_ref raw='" . $ref . "' (" . gettype( $ref ) . ")\n";
+        }
+        // También probemos buscar todos los créditos sin filter
+        $all = get_posts( array( 'post_type' => 'credito', 'posts_per_page' => -1 ) );
+        echo "    TOTAL créditos en DB: " . count( $all ) . "\n";
+        foreach ( $all as $cr ) {
+            $ref = get_post_meta( $cr->ID, 'cliente_ref', true );
+            $in_my_clients = in_array( (int) $ref, array_map( 'intval', $clientes_ids ), true ) ? 'YES' : 'no';
+            echo "      #$cr->ID '$cr->post_title' ref='$ref' (" . gettype( $ref ) . ") mio=$in_my_clients\n";
+        }
+    }
+}
+
+echo "\n=== FIN DEBUG ===\n";
