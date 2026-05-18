@@ -125,9 +125,10 @@ function lga_crm_get_creditos_for_user( $user_id = null, $args = array() ) {
         return get_posts( wp_parse_args( $args, $defaults ) );
     }
 
-    // cobrador: primero traemos clientes, después créditos
-    $clientes = lga_crm_get_clientes_for_user( $user_id, array( 'fields' => 'ids' ) );
-    $cliente_ids = wp_list_pluck( $clientes, 'ID' );
+    // cobrador: primero traemos clientes, después créditos.
+    // OJO: con 'fields' => 'ids', get_posts() ya devuelve array de IDs (no objetos),
+    // así que NO hay que aplicar wp_list_pluck.
+    $cliente_ids = lga_crm_get_clientes_for_user( $user_id, array( 'fields' => 'ids' ) );
     if ( empty( $cliente_ids ) ) {
         return array();
     }
