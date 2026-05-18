@@ -112,4 +112,31 @@ foreach ( array( 'cobrador-1', 'cobrador-2' ) as $login ) {
     }
 }
 
+echo "\n=== DEBUG LEADS (problema counter Leads) ===\n";
+$all_leads = get_posts( array( 'post_type' => 'lead', 'posts_per_page' => -1, 'post_status' => array('publish','draft') ) );
+echo "TOTAL leads en DB (admin pure get_posts): " . count( $all_leads ) . "\n";
+foreach ( $all_leads as $l ) {
+    $status = get_post_meta( $l->ID, 'lead_status', true );
+    $resp = get_post_meta( $l->ID, 'responsable', true );
+    echo "  #" . $l->ID . " '" . $l->post_title . "' status='" . $status . "' resp='" . $resp . "' post_status='" . $l->post_status . "'\n";
+}
+
+echo "\n--- via lga_crm_get_leads_for_user (admin) ---\n";
+$gero = get_user_by( 'login', 'gerolopezge@gmail.com' );
+if ( ! $gero ) $gero = get_user_by( 'email', 'gerolopezge@gmail.com' );
+$admin_id = $gero ? $gero->ID : 1;
+echo "admin ID: $admin_id\n";
+if ( function_exists( 'lga_crm_get_leads_for_user' ) ) {
+    $leads_admin = lga_crm_get_leads_for_user( $admin_id );
+    echo "lga_crm_get_leads_for_user($admin_id): " . count( $leads_admin ) . " items\n";
+    foreach ( $leads_admin as $l ) {
+        $status = get_field( 'lead_status', $l->ID );
+        echo "  #" . $l->ID . " '" . $l->post_title . "' status='" . $status . "'\n";
+    }
+}
+
+echo "\n--- include_closed=true ---\n";
+$leads_all = lga_crm_get_leads_for_user( $admin_id, array( 'include_closed' => true ) );
+echo "lga_crm_get_leads_for_user(admin, include_closed=true): " . count( $leads_all ) . " items\n";
+
 echo "\n=== FIN DEBUG ===\n";
