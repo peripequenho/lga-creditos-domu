@@ -1,22 +1,35 @@
 <?php
 /**
- * Integración Shopify Admin GraphQL.
+ * Integración Shopify Admin GraphQL — flow client_credentials (Dev Dashboard, 2026+).
  *
- * Flujo:
+ * Shopify cambió enero/2026: custom apps "legacy" desde admin ya no se crean.
+ * El nuevo flow es:
+ *   1. App en Dev Dashboard → genera Client ID + Client Secret
+ *   2. POST /admin/oauth/access_token con grant_type=client_credentials
+ *      → devuelve access_token shpat_xxx válido 24h
+ *   3. Usar ese access_token como X-Shopify-Access-Token contra GraphQL
+ *
+ * Cacheamos el access_token con WP transient (auto-refresh cuando expira).
+ *
+ * Flujo de negocio LGA:
  *   Form complete    → save_post_solicitud → draftOrderCreate     → Draft
  *   Convert solicitud→ no toca Shopify (copia meta a lead)         → Draft sigue
- *   Lead aprobado    → promote → draftOrderComplete (paymentPending) → Order "unfulfilled" / "No preparado"
+ *   Lead aprobado    → promote → draftOrderComplete (paymentPending) → Order "unfulfilled"
  *   Lead rechazado/perdido (todavía draft) → draftOrderDelete       → eliminado
  *   Lead rechazado/perdido (ya order)     → orderCancel (reason=DECLINED) → Order cancelled
  *
  * Configuración requerida en wp-config.php:
- *   define( 'LGA_SHOPIFY_SHOP',          'mem1a9-ev.myshopify.com' );  // sin protocolo
- *   define( 'LGA_SHOPIFY_TOKEN',         'shpat_xxxxxxxxxxxxx' );       // Admin API access token
- *   define( 'LGA_SHOPIFY_API_VERSION',   '2025-01' );                   // opcional, default 2025-01
- *   define( 'LGA_SHOPIFY_ENABLED',       true );                        // master switch
+ *   define( 'LGA_SHOPIFY_SHOP',          'mem1a9-ev.myshopify.com' );
+ *   define( 'LGA_SHOPIFY_CLIENT_ID',     '16422fb3e33239bf87b971793b5c405d' );
+ *   define( 'LGA_SHOPIFY_CLIENT_SECRET', 'shpss_xxxxxxxxxxxxx' );
+ *   define( 'LGA_SHOPIFY_API_VERSION',   '2025-01' );  // opcional
+ *   define( 'LGA_SHOPIFY_ENABLED',       true );
  *
- * Si LGA_SHOPIFY_TOKEN no está definido o LGA_SHOPIFY_ENABLED es false, este módulo
- * queda inerte (no rompe, no llama a Shopify). Útil para staging / migración.
+ * COMPATIBILIDAD HACIA ATRÁS: si en lugar de CLIENT_ID/SECRET se define
+ * LGA_SHOPIFY_TOKEN (formato viejo shpat_), se usa directo sin canjear.
+ * Esto cubre las custom apps legacy que sigan funcionando.
+ *
+ * Si nada está configurado o LGA_SHOPIFY_ENABLED=false, el módulo queda inerte.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -28,7 +41,73 @@ function lga_crm_shopify_enabled() {
     if ( defined( 'LGA_SHOPIFY_ENABLED' ) && ! LGA_SHOPIFY_ENABLED ) {
         return false;
     }
-    return defined( 'LGA_SHOPIFY_TOKEN' ) && LGA_SHOPIFY_TOKEN && defined( 'LGA_SHOPIFY_SHOP' ) && LGA_SHOPIFY_SHOP;
+    if ( ! defined( 'LGA_SHOPIFY_SHOP' ) || ! LGA_SHOPIFY_SHOP ) {
+        return false;
+    }
+    // Nuevo flow (client_credentials): CLIENT_ID + CLIENT_SECRET
+    $has_credentials = defined( 'LGA_SHOPIFY_CLIENT_ID' ) && LGA_SHOPIFY_CLIENT_ID
+                    && defined( 'LGA_SHOPIFY_CLIENT_SECRET' ) && LGA_SHOPIFY_CLIENT_SECRET;
+    // Legacy fallback: TOKEN directo
+    $has_legacy_token = defined( 'LGA_SHOPIFY_TOKEN' ) && LGA_SHOPIFY_TOKEN;
+    return $has_credentials || $has_legacy_token;
+}
+
+/**
+ * Obtiene un access_token Admin API válido.
+ * Si hay LGA_SHOPIFY_TOKEN (legacy), lo retorna directo.
+ * Si hay CLIENT_ID+SECRET, canjea por access_token via client_credentials grant
+ * y lo cachea en WP transient (TTL = expires_in - 1h de margen).
+ * Retorna string o WP_Error.
+ */
+function lga_crm_shopify_get_access_token( $force_refresh = false ) {
+    // Legacy: token directo configurado
+    if ( defined( 'LGA_SHOPIFY_TOKEN' ) && LGA_SHOPIFY_TOKEN ) {
+        return LGA_SHOPIFY_TOKEN;
+    }
+
+    if ( ! defined( 'LGA_SHOPIFY_CLIENT_ID' ) || ! defined( 'LGA_SHOPIFY_CLIENT_SECRET' ) ) {
+        return new WP_Error( 'no_credentials', 'Falta CLIENT_ID o CLIENT_SECRET' );
+    }
+
+    $cache_key = 'lga_shopify_admin_token';
+    if ( ! $force_refresh ) {
+        $cached = get_transient( $cache_key );
+        if ( $cached ) return $cached;
+    }
+
+    $resp = wp_remote_post(
+        'https://' . LGA_SHOPIFY_SHOP . '/admin/oauth/access_token',
+        array(
+            'timeout' => 15,
+            'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
+            'body'    => array(
+                'client_id'     => LGA_SHOPIFY_CLIENT_ID,
+                'client_secret' => LGA_SHOPIFY_CLIENT_SECRET,
+                'grant_type'    => 'client_credentials',
+            ),
+        )
+    );
+
+    if ( is_wp_error( $resp ) ) {
+        return $resp;
+    }
+    $code = wp_remote_retrieve_response_code( $resp );
+    $body = wp_remote_retrieve_body( $resp );
+    if ( $code < 200 || $code >= 300 ) {
+        return new WP_Error( 'token_http_' . $code, "Token exchange HTTP $code: " . substr( $body, 0, 300 ) );
+    }
+    $data = json_decode( $body, true );
+    $token = $data['access_token'] ?? null;
+    if ( ! $token ) {
+        return new WP_Error( 'no_access_token', 'Respuesta sin access_token: ' . substr( $body, 0, 300 ) );
+    }
+
+    // Cachear con margen de 1h antes de expirar
+    $expires_in = (int) ( $data['expires_in'] ?? 86400 );
+    $ttl = max( 60, $expires_in - 3600 );
+    set_transient( $cache_key, $token, $ttl );
+
+    return $token;
 }
 
 function lga_crm_shopify_shop() {
@@ -64,20 +143,24 @@ function lga_crm_shopify_log( $post_id, $event, $payload = array(), $level = 'in
 
 // ─── Llamada GraphQL base ──────────────────────────────────────────────────
 /**
- * Ejecuta una mutation/query GraphQL contra Shopify Admin.
- * Retorna array con 'data' o 'errors' parseados, o WP_Error en caso de red.
+ * Ejecuta mutation/query GraphQL contra Shopify Admin.
+ * Maneja auto-refresh del access_token si el server responde 401 (token expirado).
+ * Retorna array con 'data'/'errors', o WP_Error.
  */
-function lga_crm_shopify_graphql( $query, $variables = array() ) {
+function lga_crm_shopify_graphql( $query, $variables = array(), $retry = true ) {
     if ( ! lga_crm_shopify_enabled() ) {
-        return new WP_Error( 'shopify_disabled', 'Shopify integration no configurada (falta LGA_SHOPIFY_TOKEN).' );
+        return new WP_Error( 'shopify_disabled', 'Shopify integration no configurada.' );
     }
+
+    $token = lga_crm_shopify_get_access_token();
+    if ( is_wp_error( $token ) ) return $token;
 
     $url = 'https://' . lga_crm_shopify_shop() . '/admin/api/' . lga_crm_shopify_api_version() . '/graphql.json';
 
     $response = wp_remote_post( $url, array(
         'timeout' => 30,
         'headers' => array(
-            'X-Shopify-Access-Token' => LGA_SHOPIFY_TOKEN,
+            'X-Shopify-Access-Token' => $token,
             'Content-Type'           => 'application/json',
             'Accept'                 => 'application/json',
         ),
@@ -93,11 +176,17 @@ function lga_crm_shopify_graphql( $query, $variables = array() ) {
 
     $code = wp_remote_retrieve_response_code( $response );
     $body = wp_remote_retrieve_body( $response );
-    $parsed = json_decode( $body, true );
+
+    // Si 401 y todavía tenemos retry pendiente: invalidar cache y reintentar 1 vez
+    if ( $code === 401 && $retry ) {
+        delete_transient( 'lga_shopify_admin_token' );
+        return lga_crm_shopify_graphql( $query, $variables, false );
+    }
 
     if ( $code < 200 || $code >= 300 ) {
         return new WP_Error( 'shopify_http_' . $code, "Shopify HTTP $code: " . substr( $body, 0, 500 ) );
     }
+    $parsed = json_decode( $body, true );
     if ( ! is_array( $parsed ) ) {
         return new WP_Error( 'shopify_invalid_json', 'Respuesta no JSON: ' . substr( $body, 0, 500 ) );
     }
