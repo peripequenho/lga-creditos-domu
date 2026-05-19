@@ -75,19 +75,22 @@ lga_crm_flash();
             <p class="mt-1 text-xs text-zinc-400">Cuando el admin te asigne uno, va a aparecer acá.</p>
         </div>
     <?php else: ?>
-        <?php // Helper inline para mostrar badge origen heredado del cliente
-        function lga_crm_panel_cobrador_origen_badge( $credito_id, $cliente_id ) {
-            $origen = $cliente_id ? get_field( 'origen', $cliente_id ) : '';
-            if ( ! $origen ) {
-                $sh = get_post_meta( $credito_id, 'shopify_status', true );
-                if ( $sh ) $origen = 'web';
+        <?php // Bug fix v0.3.9: envolver función en function_exists para evitar fatal
+        // "Cannot redeclare function" si el template se carga 2x (ESI, render parcial).
+        if ( ! function_exists( 'lga_crm_panel_cobrador_origen_badge' ) ) {
+            function lga_crm_panel_cobrador_origen_badge( $credito_id, $cliente_id ) {
+                $origen = $cliente_id ? get_field( 'origen', $cliente_id ) : '';
+                if ( ! $origen ) {
+                    $sh = get_post_meta( $credito_id, 'shopify_status', true );
+                    if ( $sh ) $origen = 'web';
+                }
+                if ( $origen === 'web' ) {
+                    return '<span class="lga-badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">Shopify</span>';
+                } elseif ( $origen === 'manual' ) {
+                    return '<span class="lga-badge bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10">Manual</span>';
+                }
+                return '<span class="text-zinc-400 text-xs">—</span>';
             }
-            if ( $origen === 'web' ) {
-                return '<span class="lga-badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">Shopify</span>';
-            } elseif ( $origen === 'manual' ) {
-                return '<span class="lga-badge bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10">Manual</span>';
-            }
-            return '<span class="text-zinc-400 text-xs">—</span>';
         }
         ?>
         <div class="overflow-x-auto">

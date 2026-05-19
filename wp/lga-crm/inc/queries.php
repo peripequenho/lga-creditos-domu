@@ -1,5 +1,17 @@
 <?php
 /**
+ * Query helpers + filtros automáticos por rol.
+ *
+ * pre_get_posts: en queries del frontend de los CPTs lead/cliente/credito,
+ * filtra a sólo los items donde el current user es el responsable/cobrador.
+ * admin ve todo.
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
  * Backfill: cuando se inserta un lead sin lead_status (caso REST API),
  * setearle 'nuevo' como default para que aparezca en el listado del
  * vendedor. Se engancha a save_post_lead con priority alta.
@@ -12,18 +24,6 @@ add_action( 'save_post_lead', function ( $post_id, $post, $update ) {
         update_post_meta( $post_id, 'lead_status', 'nuevo' );
     }
 }, 10, 3 );
-
-/**
- * Query helpers + filtros automáticos por rol.
- *
- * pre_get_posts: en queries del frontend de los CPTs lead/cliente/credito,
- * filtra a sólo los items donde el current user es el responsable/cobrador.
- * admin ve todo.
- */
-
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
 
 function lga_crm_filter_by_role( $query ) {
     if ( is_admin() || ! $query->is_main_query() ) {
@@ -61,9 +61,28 @@ function lga_crm_filter_by_role( $query ) {
     }
 
     if ( $post_type === 'credito' && $role === 'cobrador' ) {
-        // Los créditos del cobrador se filtran por cliente_ref → cliente.cobrador = current user.
-        // Eso es 2 niveles. Lo manejamos en queries explícitas (lga_crm_get_creditos_for_user)
-        // en lugar de via meta_query nativa.
+        // Bug fix v0.3.9: el cobrador en wp-admin/edit.php?post_type=credito veía
+        // TODOS los créditos. Filtro por cliente_ref → IN (clientes del cobrador).
+        // Hacemos lookup de clientes propios primero y armamos un IN.
+        $cliente_ids = get_posts( array(
+            'post_type'      => 'cliente',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => array( array( 'key' => 'cobrador', 'value' => $user_id, 'compare' => '=' ) ),
+            'no_found_rows'  => true,
+        ) );
+        if ( empty( $cliente_ids ) ) {
+            // Sin clientes asignados → ningún crédito visible. Forzamos query vacía.
+            $query->set( 'post__in', array( 0 ) );
+            return;
+        }
+        $meta_query = (array) $query->get( 'meta_query' );
+        $meta_query[] = array(
+            'key'     => 'cliente_ref',
+            'value'   => $cliente_ids,
+            'compare' => 'IN',
+        );
+        $query->set( 'meta_query', $meta_query );
     }
 }
 

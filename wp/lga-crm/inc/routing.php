@@ -48,7 +48,11 @@ function lga_crm_router() {
 
     // Auth gate
     if ( ! is_user_logged_in() ) {
-        wp_safe_redirect( wp_login_url( home_url( $_SERVER['REQUEST_URI'] ?? '/panel' ) ) );
+        // Bug fix v0.3.9: sanitizar REQUEST_URI antes de meterlo en la URL de login.
+        $req_uri = isset( $_SERVER['REQUEST_URI'] )
+            ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) )
+            : '/panel';
+        wp_safe_redirect( wp_login_url( home_url( $req_uri ) ) );
         exit;
     }
 
@@ -81,11 +85,18 @@ function lga_crm_router() {
     // Permission check by role (no map_meta_cap interference)
     $can = in_array( $role, $entry['roles'], true );
     if ( ! $can ) {
+        // Bug fix v0.3.9: si el rol NO está en {administrator, vendedor, cobrador},
+        // mostrar 403 en lugar de redirigir a /panel/admin (que rebota y crea loop infinito).
+        $known_roles = array( 'administrator', 'vendedor', 'cobrador' );
+        if ( ! in_array( $role, $known_roles, true ) ) {
+            status_header( 403 );
+            wp_die( 'Tu rol (' . esc_html( $role ?: 'sin rol' ) . ') no tiene acceso al panel LGA. Contactá al admin.', 'Acceso denegado', array( 'response' => 403 ) );
+        }
         // No loop a /panel: si ya estaba intentando entrar a /panel y falló (no debería),
         // mostrar 403 directo. Si entró a otra ruta, llevarlo a su panel default.
         if ( $route === 'panel' ) {
             status_header( 403 );
-            wp_die( 'No tenés un rol asignado o tu rol no permite acceder al panel. Contactá al admin.', 'Acceso denegado', array( 'response' => 403 ) );
+            wp_die( 'No tenés permiso para acceder a esta sección.', 'Acceso denegado', array( 'response' => 403 ) );
         }
         // Mandar a su panel correspondiente sin pasar por /panel router (evita loop)
         $target = '/panel/admin';

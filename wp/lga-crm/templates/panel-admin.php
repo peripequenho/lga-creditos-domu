@@ -44,9 +44,9 @@ lga_crm_flash();
         <div class="mt-1 text-xs text-zinc-500"><?php echo $count_sol > 0 ? 'requieren acción' : 'sin pendientes'; ?></div>
     </a>
     <a href="?tab=leads" class="lga-kpi hover:ring-2 hover:ring-blue-700/20 transition-shadow">
-        <div class="lga-kpi-label">Leads totales</div>
+        <div class="lga-kpi-label">Leads activos</div>
         <div class="lga-kpi-value text-blue-700"><?php echo (int) $count_leads; ?></div>
-        <div class="mt-1 text-xs text-zinc-500">en evaluación</div>
+        <div class="mt-1 text-xs text-zinc-500">nuevos + en visita</div>
     </a>
     <a href="?tab=clientes" class="lga-kpi hover:ring-2 hover:ring-emerald-700/20 transition-shadow">
         <div class="lga-kpi-label">Clientes</div>

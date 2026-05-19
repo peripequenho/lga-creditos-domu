@@ -163,7 +163,25 @@ function lga_crm_handle_update_lead_status() {
         wp_die( 'Estado inválido.', 400 );
     }
 
-    update_field( 'lead_status', $new_status, $lead_id );
+    // Bug fix v0.3.9: si el nuevo estado es 'aprobado', INTENTAR PROMOVER PRIMERO.
+    // Solo aplicamos el status si el promote fue exitoso, para no dejar leads
+    // en estado "aprobado" pero sin cliente/credito asociado (limbo).
+    $previous_status = (string) get_field( 'lead_status', $lead_id );
+
+    if ( $new_status === 'aprobado' ) {
+        $result = lga_crm_promote_lead_to_client_credit( $lead_id, array() );
+        if ( is_wp_error( $result ) ) {
+            // NO actualizamos lead_status: el lead conserva su estado anterior. Mensaje de error.
+            wp_safe_redirect( add_query_arg( array(
+                'err' => 'promote_failed',
+                'msg_detail' => substr( $result->get_error_message(), 0, 100 ),
+            ), home_url( '/lead/' . $lead_id . '/' ) ) );
+            exit;
+        }
+        // Promote OK → ya seteó lead_status='aprobado' adentro. Avanzar.
+    } else {
+        update_field( 'lead_status', $new_status, $lead_id );
+    }
 
     $notes = sanitize_textarea_field( $_POST['internal_notes'] ?? '' );
     if ( $notes ) {
@@ -173,14 +191,7 @@ function lga_crm_handle_update_lead_status() {
         update_field( 'internal_notes', $new_notes, $lead_id );
     }
 
-    // Si el nuevo estado es 'aprobado', auto-promover a cliente + crédito.
-    if ( $new_status === 'aprobado' ) {
-        $result = lga_crm_promote_lead_to_client_credit( $lead_id, array() );
-        if ( is_wp_error( $result ) ) {
-            // No interrumpimos el flujo, dejamos el lead como aprobado y mensaje de error.
-            wp_safe_redirect( add_query_arg( 'err', 'promote_failed', home_url( '/lead/' . $lead_id . '/' ) ) );
-            exit;
-        }
+    if ( $new_status === 'aprobado' && isset( $result ) && ! is_wp_error( $result ) ) {
         // Redirect según rol al listado del rol
         $role = lga_crm_current_role();
         if ( $role === 'vendedor' ) {
@@ -239,6 +250,20 @@ function lga_crm_handle_update_lead_status() {
  * Returns array('cliente_id'=>X, 'credito_id'=>Y) o WP_Error.
  */
 function lga_crm_promote_lead_to_client_credit( $lead_id, $args = array() ) {
+    // Bug fix v0.3.9: idempotencia fuerte. Si el lead ya fue promovido (tiene credito_ref válido),
+    // retornar los IDs existentes en lugar de crear un crédito duplicado.
+    $existing_credito_id = (int) get_field( 'credito_ref', $lead_id );
+    if ( $existing_credito_id && get_post_type( $existing_credito_id ) === 'credito' ) {
+        $existing_cliente_id = (int) get_field( 'cliente_ref', $lead_id );
+        if ( $existing_cliente_id && get_post_type( $existing_cliente_id ) === 'cliente' ) {
+            return array(
+                'cliente_id'    => $existing_cliente_id,
+                'credito_id'    => $existing_credito_id,
+                'already_promoted' => true,
+            );
+        }
+    }
+
     $dni = preg_replace( '/\D/', '', (string) get_field( 'dni', $lead_id ) );
     if ( ! $dni ) {
         return new WP_Error( 'no_dni', 'Lead sin DNI, no se puede promover.' );

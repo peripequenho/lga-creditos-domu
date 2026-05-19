@@ -13,9 +13,14 @@ function lga_crm_login_redirect( $redirect_to, $requested_redirect_to, $user ) {
         return $redirect_to;
     }
 
-    // Si pidió volver a una URL específica (no la default), respetar.
+    // Bug fix: usar wp_validate_redirect para evitar open redirect a dominios externos.
+    // El comportamiento previo (`strpos($url, '/wp-admin') === false`) aceptaba CUALQUIER
+    // URL externa que no contuviera '/wp-admin', incluyendo phishing.
     if ( $requested_redirect_to && strpos( $requested_redirect_to, '/wp-admin' ) === false ) {
-        return $requested_redirect_to;
+        $safe = wp_validate_redirect( $requested_redirect_to, '' );
+        if ( $safe ) {
+            return $safe;
+        }
     }
 
     $roles = (array) $user->roles;

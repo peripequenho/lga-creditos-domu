@@ -197,15 +197,50 @@
       }
     },
     {
+      "id": "shopify-complete-draft",
+      "name": "Shopify: draftOrderComplete (instant order)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2090, 500],
+      "credentials": {
+        "httpHeaderAuth": { "id": "SlwpsrxNZrq7Inu1", "name": "Shopify Domu Token" }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://mem1a9-ev.myshopify.com/admin/api/2025-01/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation lgaDraftComplete($id: ID!, $paymentPending: Boolean) { draftOrderComplete(id: $id, paymentPending: $paymentPending) { draftOrder { id order { id name displayFulfillmentStatus displayFinancialStatus } } userErrors { field message } } }', variables: { id: $json.shopify_draft_order_gid, paymentPending: true } }) }}",
+        "options": { "timeout": 20000, "response": { "response": { "neverError": true, "responseFormat": "json" } } }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "shopify-parse-order",
+      "name": "Shopify: parse complete → order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 500],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Toma el output del parse + merge (con shopify_draft_order_*) y mergea el resultado\n// del draftOrderComplete (con shopify_order_*). El draft existió milisegundos —\n// ahora es un Order unfulfilled y Shopify dispara notificación al staff.\nconst p = $('Shopify: parse + merge').first().json;\nconst resp = $input.first().json || {};\nconst data = resp?.data?.draftOrderComplete || {};\nconst errs = data.userErrors || [];\nconst order = data.draftOrder?.order;\n\n// Si el draft no se completó (no draft_id válido o error), mantener como draft_created\nif (!order) {\n  if (errs.length) {\n    p.shopify_last_error = JSON.stringify(errs).slice(0, 300);\n  }\n  return [{ json: p }];\n}\n\nconst gid = order.id;\nconst m = gid.match(/(\\d+)$/);\np.shopify_order_id   = m ? m[1] : '';\np.shopify_order_gid  = gid;\np.shopify_order_name = order.name || '';\np.shopify_order_fulfillment_status = String(order.displayFulfillmentStatus || '').toLowerCase();\np.shopify_order_financial_status   = String(order.displayFinancialStatus || '').toLowerCase();\np.shopify_status     = 'order_unfulfilled';\np.shopify_last_error = '';\nreturn [{ json: p }];\n"
+      }
+    },
+    {
       "id": "map-wp-acf",
       "name": "Map ACF for WP",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2180, 500],
+      "position": [2350, 500],
       "parameters": {
         "language": "javaScript",
         "mode": "runOnceForAllItems",
-        "jsCode": "const p = $json;\nreturn [{ json: {\n  title: p.application_code || ('LGA-' + Date.now()),\n  status: 'publish',\n  acf: {\n    first_name: p.first_name || '', last_name: p.last_name || '',\n    dni: p.dni || '', birth_date: p.birth_date || '',\n    phone: p.phone || '', email: p.email || '',\n    address_line: p.address_line || '', locality: p.locality || '',\n    province: p.province || '', postal_code: p.postal_code || '',\n    housing_status: p.housing_status || '', occupation: p.occupation || '',\n    occupation_detail: p.occupation_detail || '',\n    declared_income_ars: p.declared_income_ars || 0,\n    guarantor_name: p.guarantor_name || '', guarantor_phone: p.guarantor_phone || '',\n    guarantor_relation: p.guarantor_relation || '',\n    requested_amount_ars: p.requested_amount_ars || 0,\n    payment_frequency: p.payment_frequency || '',\n    requested_installments: p.requested_installments || 0,\n    estimated_installment_ars: p.estimated_installment_ars || 0,\n    application_status: 'submitted', zone_status: p.zone_status || '',\n    shop: p.shop || '', source: p.source || '',\n    product_id: String(p.product_id || ''), variant_id: String(p.variant_id || ''),\n    product_title: p.product_title || '', product_handle: p.product_handle || '',\n    unit_price_ars: p.unit_price_ars || 0, quantity: p.quantity || 1,\n    cart_token: p.cart_token || '', cart_total_ars: p.cart_total_ars || 0,\n    cart_summary: p.cart_summary || '',\n    utm_source: p.utm_source || '', utm_medium: p.utm_medium || '',\n    utm_campaign: p.utm_campaign || '', utm_content: p.utm_content || '',\n    utm_term: p.utm_term || '', referrer_url: p.referrer_url || '',\n    landing_url: p.landing_url || '',\n    application_code: p.application_code || '',\n    application_id: p.application_id || '', client_id: p.client_id || '',\n    supabase_synced_at: new Date().toISOString().replace('T',' ').slice(0,19),\n    shopify_draft_order_id:   p.shopify_draft_order_id || '',\n    shopify_draft_order_gid:  p.shopify_draft_order_gid || '',\n    shopify_draft_order_name: p.shopify_draft_order_name || '',\n    shopify_invoice_url:      p.shopify_invoice_url || '',\n    shopify_status:           p.shopify_status || '',\n    shopify_last_error:       p.shopify_last_error || '',\n    shopify_last_sync_at:     p.shopify_status === 'draft_created' ? new Date().toISOString().replace('T',' ').slice(0,19) : '',\n  }\n}}];\n"
+        "jsCode": "const p = $json;\nconst hasShopify = !!(p.shopify_draft_order_id || p.shopify_order_id);\nreturn [{ json: {\n  title: p.application_code || ('LGA-' + Date.now()),\n  status: 'publish',\n  acf: {\n    first_name: p.first_name || '', last_name: p.last_name || '',\n    dni: p.dni || '', birth_date: p.birth_date || '',\n    phone: p.phone || '', email: p.email || '',\n    address_line: p.address_line || '', locality: p.locality || '',\n    province: p.province || '', postal_code: p.postal_code || '',\n    housing_status: p.housing_status || '', occupation: p.occupation || '',\n    occupation_detail: p.occupation_detail || '',\n    declared_income_ars: p.declared_income_ars || 0,\n    guarantor_name: p.guarantor_name || '', guarantor_phone: p.guarantor_phone || '',\n    guarantor_relation: p.guarantor_relation || '',\n    requested_amount_ars: p.requested_amount_ars || 0,\n    payment_frequency: p.payment_frequency || '',\n    requested_installments: p.requested_installments || 0,\n    estimated_installment_ars: p.estimated_installment_ars || 0,\n    application_status: 'submitted', zone_status: p.zone_status || '',\n    shop: p.shop || '', source: p.source || '',\n    product_id: String(p.product_id || ''), variant_id: String(p.variant_id || ''),\n    product_title: p.product_title || '', product_handle: p.product_handle || '',\n    unit_price_ars: p.unit_price_ars || 0, quantity: p.quantity || 1,\n    cart_token: p.cart_token || '', cart_total_ars: p.cart_total_ars || 0,\n    cart_summary: p.cart_summary || '',\n    utm_source: p.utm_source || '', utm_medium: p.utm_medium || '',\n    utm_campaign: p.utm_campaign || '', utm_content: p.utm_content || '',\n    utm_term: p.utm_term || '', referrer_url: p.referrer_url || '',\n    landing_url: p.landing_url || '',\n    application_code: p.application_code || '',\n    application_id: p.application_id || '', client_id: p.client_id || '',\n    supabase_synced_at: new Date().toISOString().replace('T',' ').slice(0,19),\n    // Shopify: draft + order (porque ahora completamos el draft al instante)\n    shopify_draft_order_id:   p.shopify_draft_order_id || '',\n    shopify_draft_order_gid:  p.shopify_draft_order_gid || '',\n    shopify_draft_order_name: p.shopify_draft_order_name || '',\n    shopify_invoice_url:      p.shopify_invoice_url || '',\n    shopify_order_id:         p.shopify_order_id || '',\n    shopify_order_gid:        p.shopify_order_gid || '',\n    shopify_order_name:       p.shopify_order_name || '',\n    shopify_order_fulfillment_status: p.shopify_order_fulfillment_status || '',\n    shopify_order_financial_status:   p.shopify_order_financial_status || '',\n    shopify_status:           p.shopify_status || '',\n    shopify_last_error:       p.shopify_last_error || '',\n    shopify_last_sync_at:     hasShopify ? new Date().toISOString().replace('T',' ').slice(0,19) : '',\n  }\n}}];\n"
       }
     },
     {
@@ -252,7 +287,9 @@
     },
     "Format Telegram message":      { "main": [[{ "node": "Send Telegram", "type": "main", "index": 0 }]] },
     "Shopify: draftOrderCreate":    { "main": [[{ "node": "Shopify: parse + merge", "type": "main", "index": 0 }]] },
-    "Shopify: parse + merge":       { "main": [[{ "node": "Map ACF for WP", "type": "main", "index": 0 }]] },
+    "Shopify: parse + merge":       { "main": [[{ "node": "Shopify: draftOrderComplete (instant order)", "type": "main", "index": 0 }]] },
+    "Shopify: draftOrderComplete (instant order)": { "main": [[{ "node": "Shopify: parse complete → order", "type": "main", "index": 0 }]] },
+    "Shopify: parse complete → order": { "main": [[{ "node": "Map ACF for WP", "type": "main", "index": 0 }]] },
     "Map ACF for WP":               { "main": [[{ "node": "Create WP solicitud", "type": "main", "index": 0 }]] }
   },
   "settings": {
