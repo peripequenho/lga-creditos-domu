@@ -157,15 +157,55 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "map-wp-acf",
-      "name": "Map ACF for WP",
+      "id": "shopify-draft-create",
+      "name": "Shopify: draftOrderCreate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, 500],
+      "credentials": {
+        "httpHeaderAuth": { "id": "SlwpsrxNZrq7Inu1", "name": "Shopify Domu Token" }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://mem1a9-ev.myshopify.com/admin/api/2025-01/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation lgaDraftCreate($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id name invoiceUrl status } userErrors { field message } } }', variables: $json.variant_id ? { input: { lineItems: [{ variantId: 'gid://shopify/ProductVariant/' + String($json.variant_id).replace(/\\D/g,''), quantity: $json.quantity || 1 }], email: $json.email || null, phone: $json.phone || null, shippingAddress: { firstName: $json.first_name || '—', lastName: $json.last_name || '—', address1: $json.address_line || '', city: $json.locality || '', province: $json.province || '', zip: $json.postal_code || '', country: 'Argentina', phone: $json.phone || '' }, billingAddress: { firstName: $json.first_name || '—', lastName: $json.last_name || '—', address1: $json.address_line || '', city: $json.locality || '', province: $json.province || '', zip: $json.postal_code || '', country: 'Argentina', phone: $json.phone || '' }, tags: ['lga-credit','lga-pending-approval','lga-app-' + $json.application_code], note: 'Crédito LGA pendiente de aprobación.\\nDNI ' + $json.dni + ' · Monto pedido $' + Math.round($json.requested_amount_ars).toLocaleString('es-AR') + ' ARS · ' + $json.requested_installments + ' cuotas ' + $json.payment_frequency + '.\\nApplication code: ' + $json.application_code, customAttributes: [{ key: 'lga_application_code', value: $json.application_code }, { key: 'lga_dni', value: $json.dni }, { key: 'lga_monto_pedido_ars', value: String(Math.round($json.requested_amount_ars)) }, { key: 'lga_cuotas', value: String($json.requested_installments) }, { key: 'lga_payment_frequency', value: $json.payment_frequency }] } } : { input: {} } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "shopify-parse-draft",
+      "name": "Shopify: parse + merge",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1960, 500],
       "parameters": {
         "language": "javaScript",
         "mode": "runOnceForAllItems",
-        "jsCode": "const p = $json;\nreturn [{ json: {\n  title: p.application_code || ('LGA-' + Date.now()),\n  status: 'publish',\n  acf: {\n    first_name: p.first_name || '', last_name: p.last_name || '',\n    dni: p.dni || '', birth_date: p.birth_date || '',\n    phone: p.phone || '', email: p.email || '',\n    address_line: p.address_line || '', locality: p.locality || '',\n    province: p.province || '', postal_code: p.postal_code || '',\n    housing_status: p.housing_status || '', occupation: p.occupation || '',\n    occupation_detail: p.occupation_detail || '',\n    declared_income_ars: p.declared_income_ars || 0,\n    guarantor_name: p.guarantor_name || '', guarantor_phone: p.guarantor_phone || '',\n    guarantor_relation: p.guarantor_relation || '',\n    requested_amount_ars: p.requested_amount_ars || 0,\n    payment_frequency: p.payment_frequency || '',\n    requested_installments: p.requested_installments || 0,\n    estimated_installment_ars: p.estimated_installment_ars || 0,\n    application_status: 'submitted', zone_status: p.zone_status || '',\n    shop: p.shop || '', source: p.source || '',\n    product_id: String(p.product_id || ''), variant_id: String(p.variant_id || ''),\n    product_title: p.product_title || '', product_handle: p.product_handle || '',\n    unit_price_ars: p.unit_price_ars || 0, quantity: p.quantity || 1,\n    cart_token: p.cart_token || '', cart_total_ars: p.cart_total_ars || 0,\n    cart_summary: p.cart_summary || '',\n    utm_source: p.utm_source || '', utm_medium: p.utm_medium || '',\n    utm_campaign: p.utm_campaign || '', utm_content: p.utm_content || '',\n    utm_term: p.utm_term || '', referrer_url: p.referrer_url || '',\n    landing_url: p.landing_url || '',\n    application_code: p.application_code || '',\n    application_id: p.application_id || '', client_id: p.client_id || '',\n    supabase_synced_at: new Date().toISOString().replace('T',' ').slice(0,19),\n  }\n}}];\n"
+        "jsCode": "const p = $('Merge final: payload + app_code').first().json;\nconst resp = $input.first().json || {};\nconst data = resp?.data?.draftOrderCreate || {};\nconst errs = data.userErrors || [];\nconst draft = data.draftOrder;\nlet shopify = {\n  shopify_draft_order_id: '', shopify_draft_order_gid: '',\n  shopify_draft_order_name: '', shopify_invoice_url: '',\n  shopify_status: '', shopify_last_error: '',\n};\nif (draft && !errs.length) {\n  const gid = draft.id;\n  const m = gid.match(/(\\d+)$/);\n  shopify = {\n    shopify_draft_order_id:   m ? m[1] : '',\n    shopify_draft_order_gid:  gid,\n    shopify_draft_order_name: draft.name || '',\n    shopify_invoice_url:      draft.invoiceUrl || '',\n    shopify_status:           'draft_created',\n    shopify_last_error:       '',\n  };\n} else if (errs.length) {\n  shopify.shopify_last_error = JSON.stringify(errs).slice(0, 300);\n  shopify.shopify_status = 'error';\n}\nreturn [{ json: { ...p, ...shopify } }];\n"
+      }
+    },
+    {
+      "id": "map-wp-acf",
+      "name": "Map ACF for WP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2180, 500],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": "const p = $json;\nreturn [{ json: {\n  title: p.application_code || ('LGA-' + Date.now()),\n  status: 'publish',\n  acf: {\n    first_name: p.first_name || '', last_name: p.last_name || '',\n    dni: p.dni || '', birth_date: p.birth_date || '',\n    phone: p.phone || '', email: p.email || '',\n    address_line: p.address_line || '', locality: p.locality || '',\n    province: p.province || '', postal_code: p.postal_code || '',\n    housing_status: p.housing_status || '', occupation: p.occupation || '',\n    occupation_detail: p.occupation_detail || '',\n    declared_income_ars: p.declared_income_ars || 0,\n    guarantor_name: p.guarantor_name || '', guarantor_phone: p.guarantor_phone || '',\n    guarantor_relation: p.guarantor_relation || '',\n    requested_amount_ars: p.requested_amount_ars || 0,\n    payment_frequency: p.payment_frequency || '',\n    requested_installments: p.requested_installments || 0,\n    estimated_installment_ars: p.estimated_installment_ars || 0,\n    application_status: 'submitted', zone_status: p.zone_status || '',\n    shop: p.shop || '', source: p.source || '',\n    product_id: String(p.product_id || ''), variant_id: String(p.variant_id || ''),\n    product_title: p.product_title || '', product_handle: p.product_handle || '',\n    unit_price_ars: p.unit_price_ars || 0, quantity: p.quantity || 1,\n    cart_token: p.cart_token || '', cart_total_ars: p.cart_total_ars || 0,\n    cart_summary: p.cart_summary || '',\n    utm_source: p.utm_source || '', utm_medium: p.utm_medium || '',\n    utm_campaign: p.utm_campaign || '', utm_content: p.utm_content || '',\n    utm_term: p.utm_term || '', referrer_url: p.referrer_url || '',\n    landing_url: p.landing_url || '',\n    application_code: p.application_code || '',\n    application_id: p.application_id || '', client_id: p.client_id || '',\n    supabase_synced_at: new Date().toISOString().replace('T',' ').slice(0,19),\n    shopify_draft_order_id:   p.shopify_draft_order_id || '',\n    shopify_draft_order_gid:  p.shopify_draft_order_gid || '',\n    shopify_draft_order_name: p.shopify_draft_order_name || '',\n    shopify_invoice_url:      p.shopify_invoice_url || '',\n    shopify_status:           p.shopify_status || '',\n    shopify_last_error:       p.shopify_last_error || '',\n    shopify_last_sync_at:     p.shopify_status === 'draft_created' ? new Date().toISOString().replace('T',' ').slice(0,19) : '',\n  }\n}}];\n"
       }
     },
     {
@@ -174,19 +214,15 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2180, 500],
-      "credentials": {
-        "httpBasicAuth": { "id": "437QgDxFZ2vpTGfw", "name": "WP Admin LGA" }
-      },
       "parameters": {
         "method": "POST",
         "url": "https://admin.lga-arg.com/wp-json/wp/v2/solicitudes",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "httpBasicAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            { "name": "Accept", "value": "application/json" },
+            { "name": "Authorization", "value": "Basic Z2Vyb2xvcGV6Z2VAZ21haWwuY29tOjRZSXggSlRlOSBBeVdYIDdqUU4gcjA2SSBMT1Iy" }
           ]
         },
         "sendBody": true,
@@ -211,11 +247,13 @@
       "main": [[
         { "node": "Respond to Form", "type": "main", "index": 0 },
         { "node": "Format Telegram message", "type": "main", "index": 0 },
-        { "node": "Map ACF for WP", "type": "main", "index": 0 }
+        { "node": "Shopify: draftOrderCreate", "type": "main", "index": 0 }
       ]]
     },
-    "Format Telegram message": { "main": [[{ "node": "Send Telegram", "type": "main", "index": 0 }]] },
-    "Map ACF for WP":          { "main": [[{ "node": "Create WP solicitud", "type": "main", "index": 0 }]] }
+    "Format Telegram message":      { "main": [[{ "node": "Send Telegram", "type": "main", "index": 0 }]] },
+    "Shopify: draftOrderCreate":    { "main": [[{ "node": "Shopify: parse + merge", "type": "main", "index": 0 }]] },
+    "Shopify: parse + merge":       { "main": [[{ "node": "Map ACF for WP", "type": "main", "index": 0 }]] },
+    "Map ACF for WP":               { "main": [[{ "node": "Create WP solicitud", "type": "main", "index": 0 }]] }
   },
   "settings": {
     "executionOrder": "v1",
