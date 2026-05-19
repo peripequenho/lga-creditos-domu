@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone output produces /.next/standalone with self-contained server.js
+  // (required by the Docker build in /opt/lga-form/form/Dockerfile on the VPS).
+  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
