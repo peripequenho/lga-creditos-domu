@@ -326,9 +326,28 @@ function lga_crm_shopify_complete_draft( $source_post_id, $propagate_to = array(
         return new WP_Error( 'no_draft', 'No hay shopify_draft_order_gid en el post fuente.' );
     }
 
-    // Idempotencia
+    // Idempotencia: si ya existe order, igualmente propagar a $propagate_to
+    // (puede ser que cliente/crédito se acaben de crear y necesiten el meta).
     $existing_order = get_post_meta( $source_post_id, 'shopify_order_id', true );
     if ( $existing_order ) {
+        $idem_meta = array(
+            'shopify_draft_order_id'           => get_post_meta( $source_post_id, 'shopify_draft_order_id', true ),
+            'shopify_draft_order_gid'          => get_post_meta( $source_post_id, 'shopify_draft_order_gid', true ),
+            'shopify_draft_order_name'         => get_post_meta( $source_post_id, 'shopify_draft_order_name', true ),
+            'shopify_order_id'                 => $existing_order,
+            'shopify_order_gid'                => get_post_meta( $source_post_id, 'shopify_order_gid', true ),
+            'shopify_order_name'               => get_post_meta( $source_post_id, 'shopify_order_name', true ),
+            'shopify_order_fulfillment_status' => get_post_meta( $source_post_id, 'shopify_order_fulfillment_status', true ),
+            'shopify_order_financial_status'   => get_post_meta( $source_post_id, 'shopify_order_financial_status', true ),
+            'shopify_status'                   => get_post_meta( $source_post_id, 'shopify_status', true ),
+            'shopify_last_sync_at'             => get_post_meta( $source_post_id, 'shopify_last_sync_at', true ),
+        );
+        foreach ( (array) $propagate_to as $other_id ) {
+            if ( ! $other_id ) continue;
+            foreach ( $idem_meta as $k => $v ) {
+                if ( $v !== '' && $v !== null ) update_post_meta( $other_id, $k, $v );
+            }
+        }
         return array( 'skipped' => 'already_completed', 'order_id' => $existing_order );
     }
 
@@ -486,20 +505,165 @@ function lga_crm_shopify_cancel_order( $source_post_id, $reason = 'DECLINED' ) {
 }
 
 // ─── 5) Hook: nuevo CPT solicitud → auto-create draft ──────────────────────
-add_action( 'save_post_solicitud', function ( $post_id, $post, $update ) {
-    if ( $update ) return;
+// Cubrimos dos vías de inserción:
+//   a) WP REST API (n8n)        → rest_after_insert_solicitud
+//   b) wp-admin / acf-form      → acf/save_post (después de que ACF persistió)
+// Ambos llaman al mismo handler idempotente (skipea si draft ya existe).
+function lga_crm_shopify_handle_new_solicitud( $post_id ) {
+    if ( ! is_numeric( $post_id ) ) return;
+    if ( get_post_type( $post_id ) !== 'solicitud' ) return;
     if ( wp_is_post_revision( $post_id ) ) return;
     if ( get_post_status( $post_id ) !== 'publish' ) return;
     if ( ! lga_crm_shopify_enabled() ) return;
 
-    // Pequeño delay: ACF puede no haber escrito todos los meta todavía.
-    // Lo encolamos como single event en 5s.
-    wp_schedule_single_event( time() + 5, 'lga_crm_shopify_draft_create_async', array( $post_id ) );
-}, 50, 3 );
+    // Idempotente: si ya tiene draft, no hace nada (cubre rest_after_insert + acf/save_post)
+    if ( get_post_meta( $post_id, 'shopify_draft_order_id', true ) ) return;
 
+    $result = lga_crm_shopify_create_draft_order( $post_id );
+    if ( is_wp_error( $result ) && $result->get_error_code() === 'no_variant' ) {
+        // variant_id puede llegar después (n8n setea meta en pasos posteriores).
+        // Re-schedule en 3s + disparar wp-cron en background para que NO sea lazy.
+        wp_schedule_single_event( time() + 3, 'lga_crm_shopify_draft_create_async', array( $post_id ) );
+        wp_remote_get( site_url( '/wp-cron.php?doing_wp_cron=1' ), array(
+            'blocking' => false,
+            'timeout'  => 0.5,
+        ) );
+    }
+}
+
+// PARALELIZACIÓN: desde v0.3.8 el draft Shopify lo crea VERCEL (fuente única,
+// en paralelo con el notify a Telegram). Los hooks de auto-create están
+// deshabilitados acá para evitar drafts duplicados. La función
+// `lga_crm_shopify_handle_new_solicitud` y `lga_crm_shopify_create_draft_order`
+// quedan disponibles como fallback: el admin puede llamar manualmente
+// /wp-json/lga/v1/solicitud/{id}/finalize si Vercel falló y la solicitud
+// quedó sin draft asociado.
+//
+// HOOKS DESHABILITADOS (intencionalmente comentados):
+// add_action( 'rest_after_insert_solicitud', ... );
+// add_action( 'acf/save_post', 'lga_crm_shopify_handle_new_solicitud', 20 );
+// add_action( 'updated_post_meta', $lga_crm_meta_handler, 20, 4 );
+// add_action( 'added_post_meta',   $lga_crm_meta_handler, 20, 4 );
+
+// Solo dejamos el cron async (lo usa el endpoint /finalize de fallback).
 add_action( 'lga_crm_shopify_draft_create_async', function ( $post_id ) {
     if ( get_post_type( $post_id ) !== 'solicitud' ) return;
     lga_crm_shopify_create_draft_order( $post_id );
+} );
+
+// ─── 6.5) REST endpoint: /wp-json/lga/v1/solicitud-by-code/{code}/shopify-meta
+// Llamado por Vercel cuando el draft Shopify se termina de crear (async, en paralelo
+// con el notify a n8n para Telegram). Busca la solicitud por application_code y
+// setea los shopify_* meta. Si la solicitud todavía no existe (race con n8n que
+// está creando el WP post), reintenta hasta 3 veces con backoff corto.
+// Auth: shared secret en header X-LGA-Secret (LGA_CRM_FINALIZE_SECRET).
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'lga/v1', '/solicitud-by-code/(?P<code>[A-Za-z0-9_\-]+)/shopify-meta', array(
+        'methods'  => 'POST',
+        'permission_callback' => function ( $request ) {
+            $expected = defined( 'LGA_CRM_FINALIZE_SECRET' ) ? LGA_CRM_FINALIZE_SECRET : '';
+            $got = $request->get_header( 'x-lga-secret' );
+            if ( ! $expected || ! $got ) return false;
+            return hash_equals( $expected, $got );
+        },
+        'callback' => function ( $request ) {
+            $code = sanitize_text_field( $request['code'] );
+            if ( ! $code ) {
+                return new WP_REST_Response( array( 'ok' => false, 'error' => 'no_code' ), 400 );
+            }
+
+            // Buscar la solicitud por application_code (con retry porque n8n
+            // puede estar todavía creando el post en paralelo).
+            $post_id = 0;
+            for ( $attempt = 0; $attempt < 4; $attempt++ ) {
+                $found = get_posts( array(
+                    'post_type'      => 'solicitud',
+                    'posts_per_page' => 1,
+                    'fields'         => 'ids',
+                    'meta_query'     => array( array( 'key' => 'application_code', 'value' => $code, 'compare' => '=' ) ),
+                ) );
+                if ( ! empty( $found ) ) {
+                    $post_id = (int) $found[0];
+                    break;
+                }
+                // También probar por título (n8n setea title = application_code)
+                $by_title = get_page_by_title( $code, OBJECT, 'solicitud' );
+                if ( $by_title ) {
+                    $post_id = (int) $by_title->ID;
+                    break;
+                }
+                // Esperar 500ms antes del siguiente intento
+                if ( $attempt < 3 ) usleep( 500000 );
+            }
+
+            if ( ! $post_id ) {
+                return new WP_REST_Response( array( 'ok' => false, 'error' => 'solicitud_not_found', 'code' => $code ), 404 );
+            }
+
+            $body = $request->get_json_params() ?: array();
+            $allowed = array(
+                'shopify_draft_order_id',
+                'shopify_draft_order_gid',
+                'shopify_draft_order_name',
+                'shopify_invoice_url',
+                'shopify_status',
+            );
+            $set = array();
+            foreach ( $allowed as $k ) {
+                if ( isset( $body[ $k ] ) && $body[ $k ] !== '' ) {
+                    update_post_meta( $post_id, $k, sanitize_text_field( $body[ $k ] ) );
+                    $set[ $k ] = $body[ $k ];
+                }
+            }
+            update_post_meta( $post_id, 'shopify_last_sync_at', current_time( 'mysql' ) );
+            lga_crm_shopify_log( $post_id, 'shopify_meta_from_vercel', $set );
+
+            return new WP_REST_Response( array(
+                'ok' => true,
+                'post_id' => $post_id,
+                'set' => $set,
+            ), 200 );
+        },
+    ) );
+} );
+
+// ─── 6) REST endpoint: /wp-json/lga/v1/solicitud/{id}/finalize ─────────────
+// Llamado por n8n al final de su workflow (después de setear TODAS las metas)
+// para forzar creación inmediata del draft (sin esperar wp-cron lazy).
+// Auth: shared secret en header X-LGA-Secret (definido en wp-config como LGA_CRM_FINALIZE_SECRET)
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'lga/v1', '/solicitud/(?P<id>\d+)/finalize', array(
+        'methods'  => 'POST',
+        'permission_callback' => function ( $request ) {
+            $expected = defined( 'LGA_CRM_FINALIZE_SECRET' ) ? LGA_CRM_FINALIZE_SECRET : '';
+            $got = $request->get_header( 'x-lga-secret' );
+            if ( ! $expected || ! $got ) return false;
+            return hash_equals( $expected, $got );
+        },
+        'callback' => function ( $request ) {
+            $post_id = (int) $request['id'];
+            if ( get_post_type( $post_id ) !== 'solicitud' ) {
+                return new WP_REST_Response( array( 'ok' => false, 'error' => 'not_solicitud' ), 404 );
+            }
+            if ( get_post_meta( $post_id, 'shopify_draft_order_id', true ) ) {
+                return new WP_REST_Response( array( 'ok' => true, 'skipped' => 'already_exists',
+                    'draft_id' => get_post_meta( $post_id, 'shopify_draft_order_id', true ) ), 200 );
+            }
+            $result = lga_crm_shopify_create_draft_order( $post_id );
+            if ( is_wp_error( $result ) ) {
+                return new WP_REST_Response( array(
+                    'ok' => false,
+                    'error' => $result->get_error_code(),
+                    'message' => $result->get_error_message(),
+                ), 422 );
+            }
+            return new WP_REST_Response( array(
+                'ok' => true,
+                'draft_id' => $result['draft_id'] ?? '',
+                'draft_name' => $result['name'] ?? '',
+            ), 200 );
+        },
+    ) );
 } );
 
 // ─── 6) Helpers UI ─────────────────────────────────────────────────────────

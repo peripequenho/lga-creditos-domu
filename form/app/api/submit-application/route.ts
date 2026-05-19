@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { applicationSchema, type ApplicationInput } from '@/lib/schema';
 import { sql } from '@/lib/db';
+import { createDraftOrder, shopifyEnabled, type DraftResult } from '@/lib/shopify';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -110,6 +111,44 @@ export async function POST(req: NextRequest) {
 
     const app = appRows[0]!;
 
+    // 3.5) Disparar Shopify draftOrderCreate EN PARALELO con el resto del request.
+    // PARALELIZACIÓN TOTAL: NO se espera al draft. El notify a n8n (Telegram + crear
+    // WP post) se dispara inmediato. Cuando el draft termine (en background),
+    // hace PATCH al WP post via REST endpoint para setear shopify_* meta.
+    // Si falla: la solicitud queda en WP sin draft; el admin puede re-disparar
+    // el endpoint /wp-json/lga/v1/solicitud/<id>/finalize manualmente.
+    const draftPromise: Promise<DraftResult | null> = shopifyEnabled() && p.variant_id
+      ? createDraftOrder(p, app.application_code).catch((e) => {
+          console.error('shopify_draft_create_failed', e?.message ?? e);
+          return null;
+        })
+      : Promise.resolve(null);
+
+    // Cuando el draft termine (async, fire-and-forget), PATCH al WP post con el
+    // application_code para setear los shopify_* meta. El WP plugin tiene un
+    // endpoint dedicado para esto (auth via LGA_CRM_FINALIZE_SECRET).
+    const WP_SHOPIFY_META_URL = process.env.WP_SHOPIFY_META_URL
+      || `https://admin.lga-arg.com/wp-json/lga/v1/solicitud-by-code/${encodeURIComponent(app.application_code)}/shopify-meta`;
+    const LGA_FINALIZE_SECRET = process.env.LGA_FINALIZE_SECRET || '';
+    draftPromise.then((draft) => {
+      if (!draft) return;
+      void fetch(WP_SHOPIFY_META_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-LGA-Secret': LGA_FINALIZE_SECRET,
+        },
+        body: JSON.stringify({
+          shopify_draft_order_id:   draft.draft_id,
+          shopify_draft_order_gid:  draft.draft_gid,
+          shopify_draft_order_name: draft.draft_name,
+          shopify_invoice_url:      draft.invoice_url,
+          shopify_status:           'draft_created',
+        }),
+        signal: AbortSignal.timeout(10_000),
+      }).catch((e) => console.error('wp_shopify_meta_patch_failed', e?.message ?? e));
+    });
+
     // 4) Insert document metadata rows si vinieron (paths en Storage)
     const docs: Array<{ doc_type: string; path: string | undefined }> = [
       { doc_type: 'dni_front',   path: p.doc_dni_front },
@@ -148,7 +187,14 @@ export async function POST(req: NextRequest) {
     `.catch((e) => console.error('event_insert_failed', e?.message ?? e));
 
     // 6) Notificar al equipo via n8n VPS (workflow dispara Telegram + push a WP dashboard).
-    // Payload completo: el notify workflow ahora hace 2 cosas (notif Telegram + crear post en WP).
+    // PARALELIZACIÓN TOTAL: el notify sale INMEDIATO sin esperar al Shopify draft.
+    // El draft se sigue creando en background (draftPromise) y al terminar hace
+    // PATCH al WP post via el endpoint shopify-meta (configurado arriba en 3.5).
+    // Tiempos esperados desde submit:
+    //   - Telegram llega en ~500-1000ms (no más espera de 4s al Shopify)
+    //   - WP post creado en ~1000-2000ms (en paralelo)
+    //   - Shopify draft creado en ~1000-2000ms (en paralelo)
+    //   - WP post recibe el meta de Shopify cuando el PATCH llega (~50ms después del draft)
     const NOTIFY_URL = process.env.N8N_NOTIFY_URL || 'https://n8n.lga-arg.com/webhook/lga-new-application-notify';
     void fetch(NOTIFY_URL, {
       method: 'POST',
@@ -158,6 +204,13 @@ export async function POST(req: NextRequest) {
         application_code: app.application_code,
         application_id: app.id,
         client_id: clientId,
+        // Shopify draft: pendiente al momento del notify; se setea via PATCH async.
+        // n8n crea el WP post sin estos metas; Vercel los llena cuando el draft existe.
+        shopify_draft_order_id:   '',
+        shopify_draft_order_gid:  '',
+        shopify_draft_order_name: '',
+        shopify_invoice_url:      '',
+        shopify_status:           'pending',
         // Cliente
         first_name: p.first_name,
         last_name: p.last_name,
