@@ -307,200 +307,160 @@ function lga_crm_shopify_create_draft_order( $sol_id ) {
     return array( 'draft_id' => $numeric_id, 'gid' => $gid, 'name' => $draft['name'] ?? '' );
 }
 
+// ─── Helper: llamar al webhook n8n lifecycle ──────────────────────────────
+// Desde v0.3.8: las mutaciones Shopify (complete/cancel/delete) se ejecutan
+// en n8n, no en el plugin. Esto desacopla el plugin de los CLIENT_ID/SECRET
+// Shopify y permite que la app "LGA CRM Integration" haga el trabajo via
+// el access token guardado en el credential 'Shopify Domu Token' del VPS.
+//
+// El webhook devuelve { ok, action, new_meta: {...}, error? }.
+// Las metas se aplican localmente en el plugin (este código).
+function lga_crm_shopify_n8n_lifecycle( $action, $payload ) {
+    $url = defined( 'LGA_N8N_LIFECYCLE_WEBHOOK' )
+        ? LGA_N8N_LIFECYCLE_WEBHOOK
+        : 'https://n8n.lga-arg.com/webhook/lga-shopify-lifecycle';
+
+    $resp = wp_remote_post( $url, array(
+        'timeout' => 25,
+        'headers' => array( 'Content-Type' => 'application/json' ),
+        'body'    => wp_json_encode( array_merge( array( 'action' => $action ), $payload ) ),
+    ) );
+
+    if ( is_wp_error( $resp ) ) return $resp;
+    $code = wp_remote_retrieve_response_code( $resp );
+    $body = wp_remote_retrieve_body( $resp );
+    $data = json_decode( $body, true );
+
+    if ( ! is_array( $data ) ) {
+        return new WP_Error( 'n8n_invalid_response', 'Respuesta no JSON ' . $code . ': ' . substr( $body, 0, 200 ) );
+    }
+    if ( $code < 200 || $code >= 300 || ! $data['ok'] ) {
+        return new WP_Error( 'n8n_failed', $data['error'] ?? ( 'HTTP ' . $code ) );
+    }
+    return $data;
+}
+
+// Aplica metas a varios posts (source + propagate_to)
+function lga_crm_shopify_apply_meta( $source_post_id, $propagate_to, $meta_map ) {
+    $ids = array_merge( array( $source_post_id ), (array) $propagate_to );
+    foreach ( $ids as $id ) {
+        if ( ! $id ) continue;
+        foreach ( $meta_map as $k => $v ) {
+            if ( $v !== '' && $v !== null ) update_post_meta( $id, $k, $v );
+        }
+    }
+}
+
 // ─── 2) Completar Draft Order → Order "unfulfilled" / "No preparado" ──────
 /**
  * Llamar cuando el LEAD se aprueba → cliente + crédito creados.
- * $source_post puede ser el lead, el cliente o el credito (el que tenga el meta).
- * Toma el draft_order_id de cualquiera y lo completa con paymentPending=true.
+ * Usa el webhook n8n /lga-shopify-lifecycle (action: complete_draft).
  */
 function lga_crm_shopify_complete_draft( $source_post_id, $propagate_to = array() ) {
-    if ( ! lga_crm_shopify_enabled() ) return new WP_Error( 'disabled', 'disabled' );
-
-    $draft_gid = get_post_meta( $source_post_id, 'shopify_draft_order_gid', true );
-    if ( ! $draft_gid ) {
-        // intentar reconstruir desde numeric
-        $num = get_post_meta( $source_post_id, 'shopify_draft_order_id', true );
-        if ( $num ) $draft_gid = 'gid://shopify/DraftOrder/' . preg_replace( '/\D/', '', $num );
-    }
-    if ( ! $draft_gid ) {
-        return new WP_Error( 'no_draft', 'No hay shopify_draft_order_gid en el post fuente.' );
+    $draft_id = preg_replace( '/\D/', '', (string) get_post_meta( $source_post_id, 'shopify_draft_order_id', true ) );
+    if ( ! $draft_id ) {
+        return new WP_Error( 'no_draft', 'No hay shopify_draft_order_id en el post fuente.' );
     }
 
-    // Idempotencia: si ya existe order, igualmente propagar a $propagate_to
-    // (puede ser que cliente/crédito se acaben de crear y necesiten el meta).
+    // Idempotencia: si ya existe order, propagar metas existentes y salir.
     $existing_order = get_post_meta( $source_post_id, 'shopify_order_id', true );
     if ( $existing_order ) {
-        $idem_meta = array(
-            'shopify_draft_order_id'           => get_post_meta( $source_post_id, 'shopify_draft_order_id', true ),
-            'shopify_draft_order_gid'          => get_post_meta( $source_post_id, 'shopify_draft_order_gid', true ),
-            'shopify_draft_order_name'         => get_post_meta( $source_post_id, 'shopify_draft_order_name', true ),
-            'shopify_order_id'                 => $existing_order,
-            'shopify_order_gid'                => get_post_meta( $source_post_id, 'shopify_order_gid', true ),
-            'shopify_order_name'               => get_post_meta( $source_post_id, 'shopify_order_name', true ),
-            'shopify_order_fulfillment_status' => get_post_meta( $source_post_id, 'shopify_order_fulfillment_status', true ),
-            'shopify_order_financial_status'   => get_post_meta( $source_post_id, 'shopify_order_financial_status', true ),
-            'shopify_status'                   => get_post_meta( $source_post_id, 'shopify_status', true ),
-            'shopify_last_sync_at'             => get_post_meta( $source_post_id, 'shopify_last_sync_at', true ),
-        );
-        foreach ( (array) $propagate_to as $other_id ) {
-            if ( ! $other_id ) continue;
-            foreach ( $idem_meta as $k => $v ) {
-                if ( $v !== '' && $v !== null ) update_post_meta( $other_id, $k, $v );
-            }
+        $idem_meta = array();
+        foreach ( array(
+            'shopify_draft_order_id','shopify_draft_order_gid','shopify_draft_order_name',
+            'shopify_order_id','shopify_order_gid','shopify_order_name',
+            'shopify_order_fulfillment_status','shopify_order_financial_status',
+            'shopify_status','shopify_last_sync_at',
+        ) as $k ) {
+            $idem_meta[ $k ] = get_post_meta( $source_post_id, $k, true );
         }
+        lga_crm_shopify_apply_meta( $source_post_id, $propagate_to, $idem_meta );
         return array( 'skipped' => 'already_completed', 'order_id' => $existing_order );
     }
 
-    $mutation = 'mutation lgaDraftComplete($id: ID!, $paymentPending: Boolean) {
-      draftOrderComplete(id: $id, paymentPending: $paymentPending) {
-        draftOrder {
-          id
-          order {
-            id
-            name
-            displayFulfillmentStatus
-            displayFinancialStatus
-          }
-        }
-        userErrors { field message }
-      }
-    }';
+    $app_code = (string) ( get_post_meta( $source_post_id, 'application_code', true ) ?: get_the_title( $source_post_id ) );
 
-    $resp = lga_crm_shopify_graphql( $mutation, array(
-        'id'             => $draft_gid,
-        'paymentPending' => true,
+    $resp = lga_crm_shopify_n8n_lifecycle( 'complete_draft', array(
+        'draft_order_id'        => $draft_id,
+        'wp_post_id'            => $source_post_id,
+        'application_code'      => $app_code,
+        'propagate_to_post_ids' => array_values( array_filter( (array) $propagate_to ) ),
     ) );
 
     if ( is_wp_error( $resp ) ) {
-        lga_crm_shopify_log( $source_post_id, 'draft_complete_http_error', array( 'error' => $resp->get_error_message() ), 'error' );
+        update_post_meta( $source_post_id, 'shopify_last_error', $resp->get_error_message() );
+        lga_crm_shopify_log( $source_post_id, 'complete_draft_failed', array( 'error' => $resp->get_error_message() ), 'error' );
         return $resp;
     }
-    $data = $resp['data']['draftOrderComplete'] ?? array();
-    $errs = $data['userErrors'] ?? array();
-    $order = $data['draftOrder']['order'] ?? null;
-    if ( ! empty( $errs ) || ! $order ) {
-        lga_crm_shopify_log( $source_post_id, 'draft_complete_user_errors', array( 'errors' => $errs, 'raw' => $resp ), 'error' );
-        return new WP_Error( 'shopify_user_error', 'Errores Shopify: ' . wp_json_encode( $errs ) );
-    }
 
-    $order_gid = $order['id']; // gid://shopify/Order/123
-    preg_match( '/(\d+)$/', $order_gid, $m );
-    $order_numeric = $m[1] ?? '';
-
-    $meta_to_set = array(
-        'shopify_order_id'               => $order_numeric,
-        'shopify_order_gid'              => $order_gid,
-        'shopify_order_name'             => $order['name'] ?? '',
-        'shopify_order_fulfillment_status'=> strtolower( (string) ( $order['displayFulfillmentStatus'] ?? '' ) ),
-        'shopify_order_financial_status' => strtolower( (string) ( $order['displayFinancialStatus'] ?? '' ) ),
-        'shopify_status'                 => 'order_unfulfilled',
-        'shopify_last_sync_at'           => current_time( 'mysql' ),
-    );
-
-    // Setear en el post fuente
-    foreach ( $meta_to_set as $k => $v ) {
-        update_post_meta( $source_post_id, $k, $v );
-    }
-    lga_crm_shopify_log( $source_post_id, 'draft_completed', array(
-        'order_numeric' => $order_numeric,
-        'order_name'    => $order['name'] ?? '',
+    $new_meta = $resp['new_meta'] ?? array();
+    lga_crm_shopify_apply_meta( $source_post_id, $propagate_to, $new_meta );
+    lga_crm_shopify_log( $source_post_id, 'draft_completed_via_n8n', array(
+        'order_id'   => $new_meta['shopify_order_id'] ?? '',
+        'order_name' => $new_meta['shopify_order_name'] ?? '',
     ) );
 
-    // Propagar a otros posts (cliente, crédito, solicitud)
-    foreach ( $propagate_to as $other_id ) {
-        if ( ! $other_id ) continue;
-        // Copiar draft meta también para tener trazabilidad
-        $draft_num = get_post_meta( $source_post_id, 'shopify_draft_order_id', true );
-        if ( $draft_num ) {
-            update_post_meta( $other_id, 'shopify_draft_order_id',  $draft_num );
-            update_post_meta( $other_id, 'shopify_draft_order_gid', $draft_gid );
-            update_post_meta( $other_id, 'shopify_draft_order_name', get_post_meta( $source_post_id, 'shopify_draft_order_name', true ) );
-        }
-        foreach ( $meta_to_set as $k => $v ) {
-            update_post_meta( $other_id, $k, $v );
-        }
-    }
-
-    return array( 'order_id' => $order_numeric, 'gid' => $order_gid, 'name' => $order['name'] ?? '' );
+    return array(
+        'order_id'   => $new_meta['shopify_order_id']   ?? '',
+        'order_name' => $new_meta['shopify_order_name'] ?? '',
+    );
 }
 
 // ─── 3) Borrar Draft Order (rechazo antes de aprobar) ──────────────────────
 function lga_crm_shopify_delete_draft( $source_post_id ) {
-    if ( ! lga_crm_shopify_enabled() ) return new WP_Error( 'disabled', 'disabled' );
-
-    $draft_gid = get_post_meta( $source_post_id, 'shopify_draft_order_gid', true );
-    if ( ! $draft_gid ) {
+    $draft_id = preg_replace( '/\D/', '', (string) get_post_meta( $source_post_id, 'shopify_draft_order_id', true ) );
+    if ( ! $draft_id ) {
         return array( 'skipped' => 'no_draft' );
     }
 
-    $mutation = 'mutation lgaDraftDelete($input: DraftOrderDeleteInput!) {
-      draftOrderDelete(input: $input) {
-        deletedId
-        userErrors { field message }
-      }
-    }';
-    $resp = lga_crm_shopify_graphql( $mutation, array(
-        'input' => array( 'id' => $draft_gid ),
+    $app_code = (string) ( get_post_meta( $source_post_id, 'application_code', true ) ?: get_the_title( $source_post_id ) );
+
+    $resp = lga_crm_shopify_n8n_lifecycle( 'cancel_draft', array(
+        'draft_order_id'   => $draft_id,
+        'wp_post_id'       => $source_post_id,
+        'application_code' => $app_code,
     ) );
+
     if ( is_wp_error( $resp ) ) {
-        lga_crm_shopify_log( $source_post_id, 'draft_delete_http_error', array( 'error' => $resp->get_error_message() ), 'error' );
+        update_post_meta( $source_post_id, 'shopify_last_error', $resp->get_error_message() );
+        lga_crm_shopify_log( $source_post_id, 'delete_draft_failed', array( 'error' => $resp->get_error_message() ), 'error' );
         return $resp;
     }
-    $data = $resp['data']['draftOrderDelete'] ?? array();
-    $errs = $data['userErrors'] ?? array();
-    if ( ! empty( $errs ) ) {
-        lga_crm_shopify_log( $source_post_id, 'draft_delete_user_errors', array( 'errors' => $errs ), 'error' );
-        return new WP_Error( 'shopify_user_error', wp_json_encode( $errs ) );
-    }
 
-    update_post_meta( $source_post_id, 'shopify_status', 'draft_deleted' );
-    update_post_meta( $source_post_id, 'shopify_last_sync_at', current_time( 'mysql' ) );
-    lga_crm_shopify_log( $source_post_id, 'draft_deleted', array( 'deletedId' => $data['deletedId'] ?? '' ) );
+    $new_meta = $resp['new_meta'] ?? array();
+    lga_crm_shopify_apply_meta( $source_post_id, array(), $new_meta );
+    lga_crm_shopify_log( $source_post_id, 'draft_deleted_via_n8n', array() );
     return array( 'deleted' => true );
 }
 
 // ─── 4) Cancelar Order (después de promote, si lead se cancela) ────────────
 function lga_crm_shopify_cancel_order( $source_post_id, $reason = 'DECLINED' ) {
-    if ( ! lga_crm_shopify_enabled() ) return new WP_Error( 'disabled', 'disabled' );
-
-    $order_gid = get_post_meta( $source_post_id, 'shopify_order_gid', true );
-    if ( ! $order_gid ) {
+    $order_id = preg_replace( '/\D/', '', (string) get_post_meta( $source_post_id, 'shopify_order_id', true ) );
+    if ( ! $order_id ) {
         return array( 'skipped' => 'no_order' );
     }
 
-    // Reasons válidos: CUSTOMER, DECLINED, FRAUD, INVENTORY, STAFF, OTHER
     $valid = array( 'CUSTOMER', 'DECLINED', 'FRAUD', 'INVENTORY', 'STAFF', 'OTHER' );
     if ( ! in_array( $reason, $valid, true ) ) $reason = 'DECLINED';
 
-    $mutation = 'mutation lgaOrderCancel($orderId: ID!, $reason: OrderCancelReason!, $refund: Boolean!, $restock: Boolean!, $notifyCustomer: Boolean) {
-      orderCancel(orderId: $orderId, reason: $reason, refund: $refund, restock: $restock, notifyCustomer: $notifyCustomer) {
-        job { id done }
-        orderCancelUserErrors { field message }
-      }
-    }';
-    $resp = lga_crm_shopify_graphql( $mutation, array(
-        'orderId'        => $order_gid,
-        'reason'         => $reason,
-        'refund'         => true,   // no hay pago real (paymentPending), igual paso true por completitud
-        'restock'        => true,
-        'notifyCustomer' => false,  // silencioso
+    $app_code = (string) ( get_post_meta( $source_post_id, 'application_code', true ) ?: get_the_title( $source_post_id ) );
+
+    $resp = lga_crm_shopify_n8n_lifecycle( 'cancel_order', array(
+        'order_id'         => $order_id,
+        'wp_post_id'       => $source_post_id,
+        'application_code' => $app_code,
+        'reason'           => $reason,
     ) );
+
     if ( is_wp_error( $resp ) ) {
-        lga_crm_shopify_log( $source_post_id, 'order_cancel_http_error', array( 'error' => $resp->get_error_message() ), 'error' );
+        update_post_meta( $source_post_id, 'shopify_last_error', $resp->get_error_message() );
+        lga_crm_shopify_log( $source_post_id, 'cancel_order_failed', array( 'error' => $resp->get_error_message() ), 'error' );
         return $resp;
     }
-    $data = $resp['data']['orderCancel'] ?? array();
-    $errs = $data['orderCancelUserErrors'] ?? array();
-    if ( ! empty( $errs ) ) {
-        lga_crm_shopify_log( $source_post_id, 'order_cancel_user_errors', array( 'errors' => $errs ), 'error' );
-        return new WP_Error( 'shopify_user_error', wp_json_encode( $errs ) );
-    }
 
-    update_post_meta( $source_post_id, 'shopify_status', 'order_cancelled' );
-    update_post_meta( $source_post_id, 'shopify_order_fulfillment_status', 'cancelled' );
-    update_post_meta( $source_post_id, 'shopify_last_sync_at', current_time( 'mysql' ) );
-    lga_crm_shopify_log( $source_post_id, 'order_cancelled', array( 'reason' => $reason, 'job' => $data['job'] ?? null ) );
-
+    $new_meta = $resp['new_meta'] ?? array();
+    lga_crm_shopify_apply_meta( $source_post_id, array(), $new_meta );
+    lga_crm_shopify_log( $source_post_id, 'order_cancelled_via_n8n', array( 'reason' => $reason ) );
     return array( 'cancelled' => true );
 }
 

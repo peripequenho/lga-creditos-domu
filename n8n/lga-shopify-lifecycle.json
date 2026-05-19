@@ -1,0 +1,451 @@
+{
+  "name": "LGA - Shopify Lifecycle (complete / cancel)",
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Webhook Shopify Lifecycle",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "lga-shopify-lifecycle",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lga-shopify-lifecycle",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "validate",
+      "name": "Validate + Lookup WP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $input.first().json.body || $input.first().json;\nconst action = String(raw.action || '').toLowerCase();\nconst validActions = ['complete_draft','cancel_draft','cancel_order'];\nif (!validActions.includes(action)) {\n  throw new Error('invalid_action â€” must be one of: ' + validActions.join(','));\n}\n\nconst draft_id = String(raw.draft_order_id || '').replace(/\\D/g, '');\nconst order_id = String(raw.order_id || '').replace(/\\D/g, '');\nconst application_code = String(raw.application_code || '');\nconst wp_post_id = Number(raw.wp_post_id) || null;\n\nif (action === 'cancel_order' && !order_id) {\n  throw new Error('missing_order_id â€” cancel_order requires order_id');\n}\nif ((action === 'complete_draft' || action === 'cancel_draft') && !draft_id) {\n  throw new Error('missing_draft_order_id â€” ' + action + ' requires draft_order_id');\n}\n\nconst draft_gid = draft_id ? `gid://shopify/DraftOrder/${draft_id}` : null;\nconst order_gid = order_id ? `gid://shopify/Order/${order_id}` : null;\nconst reason = raw.reason || 'DECLINED';\nconst propagate_to = Array.isArray(raw.propagate_to_post_ids) ? raw.propagate_to_post_ids.map(Number).filter(Boolean) : [];\n\nreturn [{ json: {\n  action,\n  wp_post_id,\n  application_code,\n  draft_id,\n  draft_gid,\n  order_id,\n  order_gid,\n  reason,\n  propagate_to,\n} }];\n"
+      }
+    },
+    {
+      "id": "switch-action",
+      "name": "Switch action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "complete_draft",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "complete_draft"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "cancel_draft",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_draft"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "cancel_order",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_order"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "complete-draft",
+      "name": "Shopify: draftOrderComplete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SlwpsrxNZrq7Inu1",
+          "name": "Shopify Domu Token"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://mem1a9-ev.myshopify.com/admin/api/2025-01/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation lgaDraftComplete($id: ID!, $paymentPending: Boolean) { draftOrderComplete(id: $id, paymentPending: $paymentPending) { draftOrder { id order { id name displayFulfillmentStatus displayFinancialStatus } } userErrors { field message } } }', variables: { id: $json.draft_gid, paymentPending: true } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "parse-complete",
+      "name": "Parse: complete result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ctx = $('Validate + Lookup WP').first().json;\nconst resp = $input.first().json || {};\nconst data = resp?.data?.draftOrderComplete || {};\nconst errs = data.userErrors || [];\nconst order = data.draftOrder?.order;\nlet result;\nif (!order || errs.length) {\n  result = {\n    ...ctx,\n    ok: false,\n    error: errs.length ? JSON.stringify(errs).slice(0, 300) : 'no_order_in_response',\n    raw: JSON.stringify(resp).slice(0, 500),\n  };\n} else {\n  const m = order.id.match(/(\\d+)$/);\n  result = {\n    ...ctx,\n    ok: true,\n    new_meta: {\n      shopify_order_id: m ? m[1] : '',\n      shopify_order_gid: order.id,\n      shopify_order_name: order.name || '',\n      shopify_order_fulfillment_status: String(order.displayFulfillmentStatus || '').toLowerCase(),\n      shopify_order_financial_status: String(order.displayFinancialStatus || '').toLowerCase(),\n      shopify_status: 'order_unfulfilled',\n      shopify_last_sync_at: new Date().toISOString().replace('T',' ').slice(0,19),\n      shopify_last_error: '',\n    },\n  };\n}\nreturn [{ json: result }];\n"
+      }
+    },
+    {
+      "id": "cancel-draft",
+      "name": "Shopify: draftOrderDelete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SlwpsrxNZrq7Inu1",
+          "name": "Shopify Domu Token"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://mem1a9-ev.myshopify.com/admin/api/2025-01/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation lgaDraftDelete($input: DraftOrderDeleteInput!) { draftOrderDelete(input: $input) { deletedId userErrors { field message } } }', variables: { input: { id: $json.draft_gid } } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "parse-cancel-draft",
+      "name": "Parse: cancel draft result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ctx = $('Validate + Lookup WP').first().json;\nconst resp = $input.first().json || {};\nconst data = resp?.data?.draftOrderDelete || {};\nconst errs = data.userErrors || [];\nlet result;\nif (errs.length) {\n  result = { ...ctx, ok: false, error: JSON.stringify(errs).slice(0, 300) };\n} else {\n  result = {\n    ...ctx,\n    ok: true,\n    new_meta: {\n      shopify_status: 'draft_deleted',\n      shopify_last_sync_at: new Date().toISOString().replace('T',' ').slice(0,19),\n      shopify_last_error: '',\n    },\n  };\n}\nreturn [{ json: result }];\n"
+      }
+    },
+    {
+      "id": "cancel-order",
+      "name": "Shopify: orderCancel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SlwpsrxNZrq7Inu1",
+          "name": "Shopify Domu Token"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://mem1a9-ev.myshopify.com/admin/api/2025-01/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation lgaOrderCancel($orderId: ID!, $reason: OrderCancelReason!, $refund: Boolean!, $restock: Boolean!, $notifyCustomer: Boolean) { orderCancel(orderId: $orderId, reason: $reason, refund: $refund, restock: $restock, notifyCustomer: $notifyCustomer) { job { id done } orderCancelUserErrors { field message } } }', variables: { orderId: $json.order_gid, reason: $json.reason || 'DECLINED', refund: true, restock: true, notifyCustomer: false } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "parse-cancel-order",
+      "name": "Parse: cancel order result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        500
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ctx = $('Validate + Lookup WP').first().json;\nconst resp = $input.first().json || {};\nconst data = resp?.data?.orderCancel || {};\nconst errs = data.orderCancelUserErrors || [];\nlet result;\nif (errs.length) {\n  result = { ...ctx, ok: false, error: JSON.stringify(errs).slice(0, 300) };\n} else {\n  result = {\n    ...ctx,\n    ok: true,\n    new_meta: {\n      shopify_status: 'order_cancelled',\n      shopify_order_fulfillment_status: 'cancelled',\n      shopify_last_sync_at: new Date().toISOString().replace('T',' ').slice(0,19),\n      shopify_last_error: '',\n    },\n  };\n}\nreturn [{ json: result }];\n"
+      }
+    },
+    {
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $json.ok, action: $json.action, wp_post_id: $json.wp_post_id, application_code: $json.application_code, new_meta: $json.new_meta || {}, error: $json.error || null }) }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 422 }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Shopify Lifecycle": {
+      "main": [
+        [
+          {
+            "node": "Validate + Lookup WP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate + Lookup WP": {
+      "main": [
+        [
+          {
+            "node": "Switch action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch action": {
+      "main": [
+        [
+          {
+            "node": "Shopify: draftOrderComplete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Shopify: draftOrderDelete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Shopify: orderCancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify: draftOrderComplete": {
+      "main": [
+        [
+          {
+            "node": "Parse: complete result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse: complete result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify: draftOrderDelete": {
+      "main": [
+        [
+          {
+            "node": "Parse: cancel draft result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse: cancel draft result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify: orderCancel": {
+      "main": [
+        [
+          {
+            "node": "Parse: cancel order result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse: cancel order result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "timezone": "America/Argentina/Buenos_Aires"
+  }
+}
