@@ -113,12 +113,14 @@
 <script>
 (function () {
   'use strict';
+  // Idempotente: si ya pegamos el snippet en /cart Y en cart-drawer, solo el primero
+  // registra los handlers. Las re-instancias del DOM (cart-drawer recreado al abrir
+  // en Dawn-based themes) son cubiertas por event delegation en `document`.
+  if (window.__lgaCreditCartLoaded) return;
+  window.__lgaCreditCartLoaded = true;
+
   var FORM_BASE = 'https://creditos.domuhogar.com/aplicar';
   var SHOP      = {{ shop.permanent_domain | json }};
-  var btn       = document.getElementById('lga-credit-cart-trigger');
-  var msgEl     = document.getElementById('lga-credit-cart-msg');
-  var wrap      = document.getElementById('lga-credit-cart');
-  if (!btn || !wrap) return;
 
   // --- UTM helpers ----------------------------------------------------------
   function readUtmFromUrl() {
@@ -135,26 +137,29 @@
   }
   var utm = Object.assign({}, readUtmCookie(), readUtmFromUrl());
 
-  // --- Mensajes inline ------------------------------------------------------
+  // --- Helpers DOM ----------------------------------------------------------
+  function eachWrap(fn) { document.querySelectorAll('#lga-credit-cart, .lga-credit-wrap[data-context="cart"]').forEach(fn); }
+  function getBtns() { return document.querySelectorAll('#lga-credit-cart-trigger, [data-context="cart"] .lga-credit-btn'); }
+  function getMsgs() { return document.querySelectorAll('#lga-credit-cart-msg'); }
   function showMsg(text, isError) {
-    if (!msgEl) return;
-    msgEl.textContent = text;
-    msgEl.classList.add('is-visible');
-    msgEl.classList.toggle('is-error', !!isError);
+    getMsgs().forEach(function(m){
+      m.textContent = text;
+      m.classList.add('is-visible');
+      m.classList.toggle('is-error', !!isError);
+    });
   }
   function hideMsg() {
-    if (!msgEl) return;
-    msgEl.classList.remove('is-visible', 'is-error');
-    msgEl.textContent = '';
+    getMsgs().forEach(function(m){
+      m.classList.remove('is-visible','is-error');
+      m.textContent = '';
+    });
   }
-
-  // --- Visibility según cart count (defensa extra al CSS) -------------------
   function syncVisibility(count) {
     if (typeof count !== 'number') return;
-    wrap.style.display = (count > 0) ? '' : 'none';
+    eachWrap(function(w){ w.style.display = (count > 0) ? '' : 'none'; });
   }
 
-  // Cart sync inicial + listeners de updates del theme
+  // --- Cart sync ------------------------------------------------------------
   function refreshCart() {
     fetch('/cart.js', { credentials: 'same-origin', headers: {'Accept':'application/json'} })
       .then(function(r){ return r.json(); })
@@ -163,20 +168,25 @@
   }
   refreshCart();
 
-  // Dawn-based themes disparan estos eventos al cambiar el cart
   ['cart:update','cart:refresh','cart:added','cart:removed','cart-items:updated','cart-drawer:updated']
     .forEach(function(ev){ document.addEventListener(ev, refreshCart); });
 
-  // Listener directo en cart-drawer custom element (Dawn)
-  var drawer = document.querySelector('cart-drawer');
-  if (drawer && 'MutationObserver' in window) {
-    new MutationObserver(refreshCart).observe(drawer, { attributes: true, attributeFilter: ['class'] });
+  // MutationObserver: si el theme recrea el cart-drawer al abrirlo (Dawn lo hace),
+  // re-sincroniza visibility cuando aparezca un nuevo botón LGA.
+  if ('MutationObserver' in window) {
+    new MutationObserver(refreshCart).observe(document.body, { childList: true, subtree: true });
   }
 
-  // --- Click handler --------------------------------------------------------
-  btn.addEventListener('click', function () {
-    if (btn.disabled) return;
-    btn.disabled = true;
+  // --- Click handler con EVENT DELEGATION (sobrevive re-renders del drawer) -
+  // Antes el handler se enganchaba a un btn específico con `btn.addEventListener`,
+  // pero los themes Dawn (cart-drawer) destruyen y re-crean el HTML al abrir,
+  // perdiendo el listener. Con delegation en `document`, cualquier botón LGA
+  // del cart (incluso recién creado) responde al click.
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('#lga-credit-cart-trigger, [data-context="cart"] .lga-credit-btn');
+    if (!btn) return;
+    if (btn.dataset.lgaBusy === '1') return;
+    btn.dataset.lgaBusy = '1';
     hideMsg();
 
     fetch('/cart.js', { credentials: 'same-origin', headers: {'Accept':'application/json'} })
@@ -185,7 +195,7 @@
         if (!cart || !cart.items || !cart.items.length) {
           showMsg('Tu carrito está vacío — agregá productos y volvé a tocar acá.', true);
           syncVisibility(0);
-          btn.disabled = false;
+          delete btn.dataset.lgaBusy;
           return;
         }
 
@@ -220,8 +230,8 @@
       })
       .catch(function(){
         showMsg('No pudimos leer el carrito. Refrescá la página e intentá de nuevo.', true);
-        btn.disabled = false;
+        delete btn.dataset.lgaBusy;
       });
-  });
+  }, true);  // capture phase — corre antes que handlers del theme
 })();
 </script>
