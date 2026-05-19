@@ -1,0 +1,340 @@
+{%- comment -%}
+LGA · Form de aplicación a crédito (Shopify Liquid template)
+==============================================================
+Reemplaza al form Next.js que corría en Vercel (creditos.domuhogar.com/aplicar).
+
+INSTALACIÓN
+-----------
+1. Online Store → Themes → Edit code
+2. Templates → Add a new template → Page → name: `aplicar-credito` (alternativo)
+3. Pegar este archivo como contenido del template.
+4. Pages → Add page → title "Aplicar crédito", handle `aplicar-credito`,
+   Online store visibility: visible.
+   Theme template: aplicar-credito (el nuevo).
+5. El form quedará en https://domuhogar.com/pages/aplicar-credito
+   (o ruta custom si configurás).
+
+CÓMO LLEGA EL CLIENTE
+---------------------
+El botón "Pagá en cuotas con crédito LGA" en el PDP/Cart navega acá pasando
+los params del producto/cart como query string:
+  ?variant_id=123&product_id=456&title=...&price=...&qty=2&cart_total=...
+Esos params se pre-fillean en el resumen y se mandan al webhook al submit.
+
+ENDPOINT
+--------
+Postea JSON a:
+  https://n8n.lga-arg.com/webhook/lga-shopify-form
+
+El webhook valida, persiste en Supabase, crea draft Shopify, manda Telegram
+y crea el CPT solicitud en WP. Todo en una sola pasada.
+{%- endcomment -%}
+
+<!doctype html>
+<style>
+  /* Wrapper para no heredar estilos raros del theme */
+  .lga-form-wrap { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #18181b; max-width: 800px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .lga-form-wrap h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 0.5rem; color: #18181b; }
+  .lga-form-wrap .lga-subtitle { color: #71717a; font-size: 0.95rem; margin-bottom: 2rem; }
+  .lga-form-wrap fieldset { border: 1px solid #e4e4e7; border-radius: 0.5rem; padding: 1.25rem 1.5rem 1.5rem; margin: 0 0 1.25rem; background: #fff; }
+  .lga-form-wrap legend { font-size: 0.875rem; font-weight: 600; padding: 0 0.5rem; color: #18181b; }
+  .lga-form-wrap .lga-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+  .lga-form-wrap .lga-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .lga-form-wrap .lga-full { grid-column: 1 / -1; }
+  .lga-form-wrap label { display: block; font-size: 0.875rem; }
+  .lga-form-wrap label > span { display: block; font-size: 0.75rem; color: #52525b; margin-bottom: 0.25rem; font-weight: 500; }
+  .lga-form-wrap input, .lga-form-wrap select, .lga-form-wrap textarea { width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #d4d4d8; border-radius: 0.375rem; font-size: 0.9rem; background: #fff; color: #18181b; font-family: inherit; }
+  .lga-form-wrap input:focus, .lga-form-wrap select:focus, .lga-form-wrap textarea:focus { outline: 2px solid #0f766e; outline-offset: 1px; border-color: #0f766e; }
+  .lga-form-wrap input[type="checkbox"] { width: auto; margin-right: 0.5rem; }
+  .lga-form-wrap textarea { min-height: 80px; resize: vertical; }
+  .lga-form-wrap .lga-order-summary { background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.875rem; }
+  .lga-form-wrap .lga-order-summary .lga-row { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+  .lga-form-wrap .lga-order-summary .lga-row strong { font-weight: 600; }
+  .lga-form-wrap .lga-actions { display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center; margin-top: 1.5rem; }
+  .lga-form-wrap button.lga-submit { background: #0f766e; color: #fff; border: 0; padding: 0.65rem 1.5rem; font-size: 0.95rem; font-weight: 500; border-radius: 0.375rem; cursor: pointer; font-family: inherit; }
+  .lga-form-wrap button.lga-submit:hover { background: #134e4a; }
+  .lga-form-wrap button.lga-submit:disabled { background: #71717a; cursor: not-allowed; }
+  .lga-form-wrap .lga-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 0.75rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; margin-bottom: 1rem; }
+  .lga-form-wrap .lga-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #065f46; padding: 1.5rem; border-radius: 0.5rem; }
+  .lga-form-wrap .lga-success h2 { margin-top: 0; color: #065f46; }
+  .lga-form-wrap .lga-success code { background: #d1fae5; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: ui-monospace, monospace; font-weight: 600; }
+  .lga-form-wrap .lga-honeypot { position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none; }
+  @media (max-width: 640px) {
+    .lga-form-wrap .lga-grid, .lga-form-wrap .lga-grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="lga-form-wrap">
+  <h1>Aplicar a crédito LGA</h1>
+  <p class="lga-subtitle">Te contactamos por WhatsApp en las próximas 24 hs hábiles para coordinar la visita.</p>
+
+  <div id="lga-order-summary" class="lga-order-summary" style="display:none">
+    <div class="lga-row"><span>Producto</span><strong id="lga-os-title">—</strong></div>
+    <div class="lga-row"><span>Cantidad</span><strong id="lga-os-qty">—</strong></div>
+    <div class="lga-row"><span>Total carrito</span><strong id="lga-os-total">—</strong></div>
+  </div>
+
+  <div id="lga-error" class="lga-error" style="display:none"></div>
+
+  <div id="lga-success" class="lga-success" style="display:none">
+    <h2>¡Solicitud recibida!</h2>
+    <p>Tu código de aplicación es <code id="lga-success-code">—</code>.</p>
+    <p>Te vamos a contactar por WhatsApp en las próximas 24 hs hábiles para coordinar la visita y completar la documentación.</p>
+    <p style="margin-bottom:0"><a href="https://domuhogar.com/" style="color:#0f766e;font-weight:500">← Volver a la tienda</a></p>
+  </div>
+
+  <form id="lga-form" novalidate>
+    <!-- Honeypot anti-bot -->
+    <div class="lga-honeypot" aria-hidden="true">
+      <label>No completar este campo<input type="text" name="hp_website" tabindex="-1" autocomplete="off"></label>
+    </div>
+
+    <fieldset>
+      <legend>Identidad</legend>
+      <div class="lga-grid">
+        <label><span>Nombre *</span><input name="first_name" required maxlength="60"></label>
+        <label><span>Apellido *</span><input name="last_name" required maxlength="60"></label>
+        <label><span>DNI * (solo números, 7-9 dígitos)</span><input name="dni" required inputmode="numeric" pattern="\d{7,9}" maxlength="9"></label>
+        <label><span>Fecha de nacimiento *</span><input name="birth_date" type="date" required></label>
+        <label><span>Teléfono * (con código de área, sin 15)</span><input name="phone" required inputmode="tel" placeholder="3815551234"></label>
+        <label><span>Email</span><input name="email" type="email" maxlength="120"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Domicilio</legend>
+      <div class="lga-grid">
+        <label class="lga-full"><span>Dirección *</span><input name="address_line" required maxlength="120" placeholder="Av. Mate de Luna 1200, Dpto B"></label>
+        <label><span>Localidad *</span><input name="locality" required maxlength="60"></label>
+        <label><span>Provincia *</span><input name="province" required maxlength="60" value="Tucumán"></label>
+        <label><span>Código postal *</span><input name="postal_code" required maxlength="8" placeholder="T4000"></label>
+        <label>
+          <span>Vivienda *</span>
+          <select name="housing_status" required>
+            <option value="">— Elegir —</option>
+            <option value="owned">Propia</option>
+            <option value="rented">Alquilada</option>
+            <option value="family">Familiar / cedida</option>
+            <option value="other">Otra</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ocupación e ingresos</legend>
+      <div class="lga-grid">
+        <label>
+          <span>Ocupación *</span>
+          <select name="occupation" required>
+            <option value="">— Elegir —</option>
+            <option value="employed_registered">Empleado registrado</option>
+            <option value="self_employed_registered">Monotributista / Autónomo</option>
+            <option value="unregistered">Trabajo informal</option>
+            <option value="retired">Jubilado / Pensionado</option>
+            <option value="homemaker">Ama de casa</option>
+            <option value="student">Estudiante</option>
+            <option value="informal">Changas / cuenta propia</option>
+            <option value="other">Otra</option>
+          </select>
+        </label>
+        <label><span>Detalle de ocupación</span><input name="occupation_detail" maxlength="120" placeholder="Ej: vendedor en comercio local"></label>
+        <label class="lga-full"><span>Ingreso declarado (ARS / mes)</span><input name="declared_income_ars" type="number" min="0" step="1000"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Crédito solicitado</legend>
+      <div class="lga-grid-3">
+        <label><span>Monto (ARS) *</span><input name="requested_amount_ars" type="number" required min="1000" step="1000"></label>
+        <label>
+          <span>Frecuencia *</span>
+          <select name="payment_frequency" required>
+            <option value="monthly">Mensual</option>
+            <option value="weekly">Semanal</option>
+            <option value="daily">Diaria</option>
+          </select>
+        </label>
+        <label><span>Cantidad de cuotas *</span><input name="requested_installments" type="number" required min="1" max="36" value="6"></label>
+      </div>
+      <div class="lga-grid" style="margin-top:1rem">
+        <label class="lga-full"><span>Cuota estimada (opcional, ARS)</span><input name="estimated_installment_ars" type="number" min="0" step="100"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Garante (opcional)</legend>
+      <div class="lga-grid">
+        <label><span>Nombre completo</span><input name="guarantor_name" maxlength="120"></label>
+        <label><span>Teléfono</span><input name="guarantor_phone" inputmode="tel"></label>
+        <label class="lga-full"><span>Relación</span><input name="guarantor_relation" maxlength="60" placeholder="Familiar, conocido, etc."></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Consentimientos</legend>
+      <label style="display:flex;align-items:flex-start;font-size:0.875rem;line-height:1.5">
+        <input type="checkbox" name="marketing_consent" value="1" style="margin-top:0.2rem">
+        <span style="margin-left:0;font-size:0.85rem;color:#52525b">Acepto que LGA me contacte por WhatsApp/email con información de mi solicitud y novedades.</span>
+      </label>
+    </fieldset>
+
+    <div class="lga-actions">
+      <button type="submit" class="lga-submit" id="lga-btn">Enviar solicitud</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── Endpoint del webhook n8n (cambiar si el host es distinto) ──────────
+  var WEBHOOK_URL = 'https://n8n.lga-arg.com/webhook/lga-shopify-form';
+
+  // ─── Helpers ────────────────────────────────────────────────────────────
+  function uuid() {
+    if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+  function money(n) {
+    var v = Math.round(Number(n) || 0);
+    return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function qs(k) {
+    var p = new URLSearchParams(window.location.search);
+    return p.get(k) || '';
+  }
+
+  // ─── Pre-fill del resumen de pedido desde query string ──────────────────
+  var prodTitle = qs('title') || qs('product_title');
+  var price     = qs('price') || qs('unit_price_ars') || qs('cart_total');
+  var qty       = qs('qty') || qs('quantity') || '1';
+  var cartTotal = qs('cart_total') || qs('cart_total_ars');
+
+  if (prodTitle || price || cartTotal) {
+    document.getElementById('lga-order-summary').style.display = 'block';
+    document.getElementById('lga-os-title').textContent = prodTitle || '—';
+    document.getElementById('lga-os-qty').textContent = qty || '1';
+    document.getElementById('lga-os-total').textContent = cartTotal ? money(cartTotal) : (price ? money(price) : '—');
+    // Pre-fill el monto pretendido con el total del carrito si vino
+    var montoInput = document.querySelector('input[name="requested_amount_ars"]');
+    if (montoInput && !montoInput.value && (cartTotal || price)) {
+      montoInput.value = Math.round(Number(cartTotal || price) || 0);
+    }
+  }
+
+  // ─── Submit handler ─────────────────────────────────────────────────────
+  var form = document.getElementById('lga-form');
+  var btn = document.getElementById('lga-btn');
+  var errorBox = document.getElementById('lga-error');
+  var successBox = document.getElementById('lga-success');
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+    errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function hideError() {
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+  }
+
+  form.addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    hideError();
+
+    // Honeypot anti-bot
+    var hp = form.querySelector('[name="hp_website"]');
+    if (hp && hp.value) {
+      // No mostramos nada, simulamos éxito silencioso
+      successBox.style.display = 'block';
+      form.style.display = 'none';
+      return;
+    }
+
+    // Validar nativo
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    // Recolectar valores
+    var fd = new FormData(form);
+    var payload = {};
+    fd.forEach(function(v, k) {
+      if (k === 'hp_website') return; // honeypot, no mandar
+      payload[k] = typeof v === 'string' ? v.trim() : v;
+    });
+
+    // Convertir checkbox marketing
+    payload.marketing_consent = !!fd.get('marketing_consent');
+
+    // Numéricos
+    ['requested_amount_ars','requested_installments','declared_income_ars',
+     'estimated_installment_ars','quantity','unit_price_ars','cart_total_ars',
+     'product_id','variant_id'].forEach(function(k) {
+      if (payload[k] !== undefined && payload[k] !== '') {
+        var n = Number(payload[k]);
+        if (Number.isFinite(n)) payload[k] = n;
+      }
+    });
+
+    // Idempotency + query string + UTM
+    payload.idempotency_key = uuid();
+    payload.shop          = 'domu';
+    payload.source        = qs('source') || 'shopify_pdp';
+    payload.product_id    = payload.product_id    || qs('product_id')    || '';
+    payload.variant_id    = payload.variant_id    || qs('variant_id')    || '';
+    payload.product_title = payload.product_title || qs('product_title') || qs('title') || '';
+    payload.product_handle= payload.product_handle|| qs('product_handle')|| qs('handle') || '';
+    payload.unit_price_ars= payload.unit_price_ars|| Number(qs('unit_price_ars') || qs('price') || 0);
+    payload.quantity      = payload.quantity      || Number(qs('quantity') || qs('qty') || 1);
+    payload.cart_token    = payload.cart_token    || qs('cart_token')    || '';
+    payload.cart_total_ars= payload.cart_total_ars|| Number(qs('cart_total_ars') || qs('cart_total') || 0);
+    payload.cart_summary  = qs('cart_summary')    || '';
+    payload.utm_source    = qs('utm_source');
+    payload.utm_medium    = qs('utm_medium');
+    payload.utm_campaign  = qs('utm_campaign');
+    payload.utm_content   = qs('utm_content');
+    payload.utm_term      = qs('utm_term');
+    payload.referrer_url  = document.referrer || '';
+    payload.landing_url   = window.location.href;
+
+    // Estado submit
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+
+    fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    .then(function(res) {
+      return res.json().catch(function() { return { ok: res.ok }; }).then(function(data) {
+        return { status: res.status, ok: res.ok, data: data };
+      });
+    })
+    .then(function(r) {
+      if (!r.ok) {
+        throw new Error((r.data && (r.data.error || r.data.message)) || ('HTTP ' + r.status));
+      }
+      // Success
+      form.style.display = 'none';
+      document.getElementById('lga-order-summary').style.display = 'none';
+      successBox.style.display = 'block';
+      var code = r.data && r.data.application_code ? r.data.application_code : '(pendiente)';
+      document.getElementById('lga-success-code').textContent = code;
+      successBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    })
+    .catch(function(err) {
+      showError('No pudimos procesar tu solicitud. Reintentá en 1 minuto. (' + (err && err.message ? err.message : 'error') + ')');
+      btn.disabled = false;
+      btn.textContent = 'Enviar solicitud';
+    });
+  });
+})();
+</script>

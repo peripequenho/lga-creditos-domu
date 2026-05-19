@@ -29,6 +29,8 @@ next-env.d.ts
 # n8n workflow exports (no commitear con credenciales)
 n8n/*.json
 !n8n/.gitkeep
+# Excepciones: workflows template SIN credenciales hardcoded (usan $env.* + credential IDs)
+!n8n/lga-shopify-form-all-in-one.json
 
 # WP credentials locales (passwords, application passwords)
 wp/credentials.local.md
