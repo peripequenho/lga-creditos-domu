@@ -11,6 +11,10 @@ if ( ! $cliente_id || get_post_type( $cliente_id ) !== 'cliente' ) {
 }
 $f = function( $k ) use ( $cliente_id ) { return get_field( $k, $cliente_id ); };
 
+// Bug fix v0.3.10: rehidratar valores si falló validación (transient por cliente_id)
+$st = lga_crm_get_form_state( 'credito_asignar_' . $cliente_id );
+$v = function( $k, $default = '' ) use ( $st ) { return lga_crm_form_value( $st, $k, $default ); };
+
 lga_crm_layout_open( 'Nuevo crédito · ' . get_the_title( $cliente_id ) );
 lga_crm_flash();
 ?>
@@ -31,27 +35,27 @@ lga_crm_flash();
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label class="block text-sm">
                 <span class="block mb-1 text-xs text-zinc-600">Monto (ARS) *</span>
-                <input type="number" name="monto_ars" required min="1" class="w-full border border-zinc-300 rounded p-2">
+                <input type="number" name="monto_ars" required min="1" value="<?php echo $v('monto_ars'); ?>" class="w-full border border-zinc-300 rounded p-2">
             </label>
             <label class="block text-sm">
                 <span class="block mb-1 text-xs text-zinc-600">Frecuencia *</span>
                 <select name="payment_frequency" class="w-full border border-zinc-300 rounded p-2">
-                    <option value="monthly">Mensual</option>
-                    <option value="weekly">Semanal</option>
-                    <option value="daily">Diaria</option>
+                    <?php $freq_sel = $v('payment_frequency','monthly'); foreach ( array('monthly'=>'Mensual','weekly'=>'Semanal','daily'=>'Diaria') as $val=>$lbl ): ?>
+                    <option value="<?php echo esc_attr( $val ); ?>" <?php selected( $freq_sel, $val ); ?>><?php echo esc_html( $lbl ); ?></option>
+                    <?php endforeach; ?>
                 </select>
             </label>
             <label class="block text-sm">
                 <span class="block mb-1 text-xs text-zinc-600">Cuotas totales *</span>
-                <input type="number" name="cuotas_totales" required min="1" class="w-full border border-zinc-300 rounded p-2">
+                <input type="number" name="cuotas_totales" required min="1" value="<?php echo $v('cuotas_totales'); ?>" class="w-full border border-zinc-300 rounded p-2">
             </label>
             <label class="block text-sm">
                 <span class="block mb-1 text-xs text-zinc-600">Cuota estimada (ARS)</span>
-                <input type="number" name="cuota_estimada_ars" min="0" class="w-full border border-zinc-300 rounded p-2">
+                <input type="number" name="cuota_estimada_ars" min="0" value="<?php echo $v('cuota_estimada_ars'); ?>" class="w-full border border-zinc-300 rounded p-2">
             </label>
             <label class="block text-sm">
                 <span class="block mb-1 text-xs text-zinc-600">Tasa aplicada (%)</span>
-                <input type="number" name="tasa_aplicada" step="0.01" min="0" class="w-full border border-zinc-300 rounded p-2">
+                <input type="number" name="tasa_aplicada" step="0.01" min="0" value="<?php echo $v('tasa_aplicada'); ?>" class="w-full border border-zinc-300 rounded p-2">
             </label>
         </div>
     </fieldset>
@@ -60,7 +64,7 @@ lga_crm_flash();
         <legend class="text-sm font-semibold px-2">Notas</legend>
         <label class="block text-sm">
             <span class="block mb-1 text-xs text-zinc-600">Notas internas</span>
-            <textarea name="internal_notes" rows="3" class="w-full border border-zinc-300 rounded p-2" placeholder="Observaciones sobre este crédito..."></textarea>
+            <textarea name="internal_notes" rows="3" class="w-full border border-zinc-300 rounded p-2" placeholder="Observaciones sobre este crédito..."><?php echo esc_textarea( $st['internal_notes'] ?? '' ); ?></textarea>
         </label>
     </fieldset>
 

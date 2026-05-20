@@ -19,6 +19,42 @@ function lga_crm_next_code( $prefix ) {
     return sprintf( '%s-%s-%04d', strtoupper( $prefix ), $today, $n );
 }
 
+/**
+ * Bug fix v0.3.10 — Forms pierden datos al fallar validación.
+ * Helpers para guardar / leer / borrar $_POST en transient por user, de modo
+ * que cuando el handler hace wp_safe_redirect(?err=...) el template del form
+ * pueda rehidratar los campos en lugar de aparecer vacío.
+ *
+ * Key del transient: `lga_form_<form_key>_<user_id>`. Expira en 5 min.
+ */
+function lga_crm_save_form_state( $form_key, $data ) {
+    $uid = get_current_user_id();
+    if ( ! $uid ) return;
+    // Filtrar nonces y campos de control que no se rehidratan
+    $skip = array( '_wpnonce', '_wp_http_referer', 'action' );
+    $clean = array();
+    foreach ( (array) $data as $k => $v ) {
+        if ( in_array( $k, $skip, true ) ) continue;
+        $clean[ $k ] = is_scalar( $v ) ? (string) $v : $v;
+    }
+    set_transient( 'lga_form_' . sanitize_key( $form_key ) . '_' . $uid, $clean, 5 * MINUTE_IN_SECONDS );
+}
+function lga_crm_get_form_state( $form_key ) {
+    $uid = get_current_user_id();
+    if ( ! $uid ) return array();
+    $data = get_transient( 'lga_form_' . sanitize_key( $form_key ) . '_' . $uid );
+    return is_array( $data ) ? $data : array();
+}
+function lga_crm_clear_form_state( $form_key ) {
+    $uid = get_current_user_id();
+    if ( ! $uid ) return;
+    delete_transient( 'lga_form_' . sanitize_key( $form_key ) . '_' . $uid );
+}
+/** Helper de render: devuelve esc_attr del valor del form state, o $default si no hay. */
+function lga_crm_form_value( $state, $key, $default = '' ) {
+    return esc_attr( isset( $state[ $key ] ) ? (string) $state[ $key ] : (string) $default );
+}
+
 // ─── Alta cliente manual ────────────────────────────────────────────
 function lga_crm_handle_create_cliente() {
     if ( ! current_user_can( 'lga_create_cliente' ) ) {
@@ -32,6 +68,8 @@ function lga_crm_handle_create_cliente() {
     $phone = sanitize_text_field( $_POST['phone'] ?? '' );
 
     if ( ! $first || ! $last || ! $dni ) {
+        // Bug fix v0.3.10: preservar POST data en transient para rehidratar form
+        lga_crm_save_form_state( 'cliente_nuevo', $_POST );
         wp_safe_redirect( add_query_arg( 'err', 'missing_required', home_url( '/admin/nuevo-cliente' ) ) );
         exit;
     }
@@ -44,6 +82,7 @@ function lga_crm_handle_create_cliente() {
         'meta_query' => array( array( 'key' => 'dni', 'value' => $dni, 'compare' => '=' ) ),
     ) );
     if ( ! empty( $existing ) ) {
+        lga_crm_clear_form_state( 'cliente_nuevo' );  // no rehidratar, ir al listado
         wp_safe_redirect( home_url( '/panel/admin/?tab=clientes&new=' . $existing[0] . '&msg=existing' ) );
         exit;
     }
@@ -82,6 +121,8 @@ function lga_crm_handle_create_cliente() {
         update_field( 'cobrador', $cobrador, $post_id );
     }
 
+    lga_crm_clear_form_state( 'cliente_nuevo' );  // submit exitoso, limpiar state
+
     // Redirect al LISTADO (no a la ficha) → browser back NO vuelve al form
     wp_safe_redirect( home_url( '/panel/admin/?tab=clientes&new=' . $post_id . '&msg=created' ) );
     exit;
@@ -103,6 +144,8 @@ function lga_crm_handle_create_credito() {
     $cuotas = (int) ( $_POST['cuotas_totales'] ?? 0 );
     $freq = sanitize_text_field( $_POST['payment_frequency'] ?? 'monthly' );
     if ( $monto <= 0 || $cuotas <= 0 ) {
+        // Bug fix v0.3.10: preservar POST data por cliente (un transient por cliente_id)
+        lga_crm_save_form_state( 'credito_asignar_' . $cliente_id, $_POST );
         wp_safe_redirect( add_query_arg( 'err', 'invalid_amounts', home_url( '/admin/cliente/' . $cliente_id . '/asignar-credito' ) ) );
         exit;
     }
@@ -135,6 +178,8 @@ function lga_crm_handle_create_credito() {
     if ( get_field( 'client_status', $cliente_id ) === 'lead' ) {
         update_field( 'client_status', 'activo', $cliente_id );
     }
+
+    lga_crm_clear_form_state( 'credito_asignar_' . $cliente_id );
 
     // Redirect al LISTADO de créditos
     wp_safe_redirect( home_url( '/panel/admin/?tab=creditos&new=' . $post_id . '&msg=created' ) );
