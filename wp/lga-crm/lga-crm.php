@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       LGA CRM
  * Description:       Sistema operativo LGA: roles (admin/vendedor/cobrador), CPTs (cliente/credito/lead) y dashboards frontend (/panel).
- * Version:           0.3.10
+ * Version:           0.3.11
  * Author:            LGA + Claude
  * Requires PHP:      7.4
  * Requires at least: 6.0
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'LGA_CRM_VERSION', '0.3.10' );
+define( 'LGA_CRM_VERSION', '0.3.11' );
 define( 'LGA_CRM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LGA_CRM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -78,7 +78,7 @@ function lga_crm_bootstrap() {
         }
     }, 1 );
 
-    // Bug fix v0.3.10: NO enqueue Tailwind CDN aca — el _layout.php ya lo carga
+    // Bug fix v0.3.11: NO enqueue Tailwind CDN aca — el _layout.php ya lo carga
     // inline en el <head>. Antes se cargaba 2x (script enqueued + inline script).
     add_action( 'wp_enqueue_scripts', function () {
         if ( ! lga_crm_is_lga_page() ) {
