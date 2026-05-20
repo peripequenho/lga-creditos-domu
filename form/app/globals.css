@@ -2,40 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
+/* ============================================================
+   Tokens espejo del theme Shopify de Domu (Shrine PRO custom).
+   Light-first · Poppins · verde #2E7D32 + rojo #DD1D1D
+   Sincronizado con CSS vars extraídos de domuhogar.com:
+     --color-base-text:            27, 27, 27
+     --color-base-solid-button-labels: 243, 241, 236
+     --color-base-outline-button-labels: 46, 125, 50
+     --color-button:               46, 125, 50  (verde primario)
+     --color-button (alt):         221, 29, 29  (rojo secundario)
+     --color-foreground:           46, 42, 57   (texto secundario)
+     --color-background:           255, 255, 255 / 243, 243, 243
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
-  /* LGA Command palette — kept in sync with lga-design-system */
-  --bg-base:        #080A0C;
-  --bg-secondary:   #0E1114;
-  --surface:        #15191E;
-  --surface-raised: #1B2026;
-  --border-color:   #2A3038;
-  --fg-primary:     #F4F1EA;
-  --fg-secondary:   #B8B2A7;
-  --fg-muted:       #7E8790;
-  --accent-bone:    #E8E3D8;
-  --accent-steel:   #5E7184;
-  --accent-olive:   #5F6B58;
-  --state-ok:       #4F8A5B;
-  --state-warn:     #C1843A;
-  --state-risk:     #A6403A;
-  --state-crit:     #7E2525;
-  --state-info:     #5E7184;
+:root {
+  color-scheme: light;
+
+  /* ===== Surfaces (light) ===== */
+  --bg-base:        #FFFFFF;
+  --bg-secondary:   #F3F3F3;
+  --surface:        #FFFFFF;
+  --surface-raised: #F8F8F8;
+  --border-color:   #E5E5E5;
+  --border-soft:    #EEEEEE;
+
+  /* ===== Foreground ===== */
+  --fg-primary:     #1B1B1B;
+  --fg-secondary:   #2E2A39;
+  --fg-muted:       #6B6B6B;
+  --fg-on-accent:   #FFFFFF;
+
+  /* ===== Domu brand colors ===== */
+  --accent-green:   #2E7D32;
+  --accent-green-h: #256528;
+  --accent-red:     #DD1D1D;
+  --accent-red-h:   #B81818;
+  --accent-blue:    #0F455B;
+  --accent-bone:    #F3F1EC;
+
+  /* ===== Functional states ===== */
+  --state-ok:       #2E7D32;
+  --state-ok-bg:    #E8F5E9;
+  --state-warn:     #ED6C02;
+  --state-warn-bg:  #FFF4E5;
+  --state-risk:     #DD1D1D;
+  --state-risk-bg:  #FDEAEA;
+  --state-info:     #0F455B;
+  --state-info-bg:  #E5EEF2;
+
+  /* ===== Form tokens (Shrine PRO defaults) ===== */
+  --inputs-radius:        6px;
+  --inputs-border-width:  1px;
+  --inputs-border-opacity: 0.6;
+  --buttons-radius:       6px;
+  --buttons-border-width: 2px;
+  --buttons-shadow:       0 4px 5px rgba(27, 27, 27, 0.05);
+
+  /* ===== Type ===== */
+  --font-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 html,
 body {
   background: var(--bg-base);
   color: var(--fg-primary);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
-  font-feature-settings: "ss01", "cv11";
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 .num,
 [data-num] {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
